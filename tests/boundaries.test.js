@@ -4,8 +4,8 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { PerspectiveCamera } from '../core/index.js';
-import { intersectPlane } from '../core/interaction/plane-drag-controller.js';
-import { FrequencyRangeController, SpeakerNode, SampledFieldPlane } from '../domains/acoustics/index.js';
+import { distanceFromRay, intersectPlane } from '../core/interaction/plane-drag-controller.js';
+import { FrequencyRangeController, OrthogonalFieldSlices, SpeakerNode, SampledFieldPlane } from '../domains/acoustics/index.js';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -35,6 +35,12 @@ test('camera center ray points at its target and intersects the floor', () => {
   assert.ok(Math.abs(point[2]) < 1e-9);
 });
 
+test('ray picking measures draggable objects in full 3D', () => {
+  const ray = { origin: [0, 0, 0], direction: [0, 0, 1] };
+  assert.deepEqual(distanceFromRay(ray, [0, 2, 5]), { distance: 2, along: 5 });
+  assert.equal(distanceFromRay(ray, [0, 0, -1]).distance, Infinity);
+});
+
 test('speaker movement invalidates dependent field data without waiting for drag end', () => {
   const speaker = new SpeakerNode({ id: 'speaker-1', position: [0, .2, 0] });
   let changes = 0;
@@ -52,4 +58,22 @@ test('speaker movement invalidates dependent field data without waiting for drag
   field.update();
   assert.equal(changes, 1);
   assert.equal(field.dirty, false);
+});
+
+test('orthogonal field slices sample the X, Y and Z planes with one shared range', () => {
+  const field = new OrthogonalFieldSlices({
+    id: 'volume-slices',
+    field: (x, y, z) => x + y + z,
+    bounds: { min: [0, 0, 0], max: [4, 3, 2] },
+    slices: { x: 1, y: 1.5, z: .5 },
+    resolution: { xz: [4, 2], xy: [4, 3], yz: [2, 3] },
+  });
+  field.update();
+  assert.equal(field.samples.length, 26);
+  assert.ok(field.samples.some(sample => sample.axis === 'x' && sample.position[0] === 1));
+  assert.ok(field.samples.some(sample => sample.axis === 'y' && sample.position[1] === 1.5));
+  assert.ok(field.samples.some(sample => sample.axis === 'z' && sample.position[2] === .5));
+  assert.ok(field.range[1] > field.range[0]);
+  field.setSlice('y', 2);
+  assert.equal(field.dirty, true);
 });
