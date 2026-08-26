@@ -7,7 +7,7 @@ domains/* -> core
 core -/-> domains/*
 ```
 
-Domain terminology is allowed. Domain lock-in is not. A module in `domains/acoustics`, for example, must be independently instantiable and usable without AcousticMate or any other originating application.
+Domain terminology is allowed. Domain lock-in is not. A module in `domains/acoustics`, for example, must be independently instantiable and usable without its originating application.
 
 ```js
 import { Scene, Group, Link } from './s3d.js';
