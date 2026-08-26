@@ -24,10 +24,16 @@ const BOX_VS = `#version 300 es
 layout(location=0) in vec3 p;
 layout(location=1) in vec3 instancePosition;
 layout(location=2) in vec3 instanceScale;
-layout(location=3) in vec3 instanceColor;
+layout(location=3) in vec4 instanceColor;
 uniform mat4 vp;
-out vec3 color;
+out vec4 color;
 void main(){ color=instanceColor; gl_Position=vp*vec4(instancePosition+p*instanceScale,1.0); }`;
+
+const BOX_FS = `#version 300 es
+precision highp float;
+in vec4 color;
+out vec4 outColor;
+void main(){ outColor=color; }`;
 
 const FLOW_VS = `#version 300 es
 layout(location=0) in vec3 p;
@@ -144,15 +150,15 @@ class WebGLBatchRenderer {
     if (!gl) throw new Error('WebGLBatchRenderer requires WebGL2 context');
     this.gl = gl;
     this.store = new RenderStore();
-    this.boxProgram = makeProgram(gl, BOX_VS, COLOR_FS);
+    this.boxProgram = makeProgram(gl, BOX_VS, BOX_FS);
     this.flowProgram = makeProgram(gl, FLOW_VS, COLOR_FS);
     this.lineProgram = makeProgram(gl, LINE_VS, COLOR_FS);
     this.textProgram = makeProgram(gl, TEXT_VS, TEXT_FS);
     this.atlas = new GlyphAtlas(gl);
-    this.stats = { drawCalls: 0, uploads: 0, uploadBytes: 0, solidBoxes: 0, outlineBoxes: 0, lineVertices: 0, glyphs: 0, flowPulses: 0 };
+    this.stats = { drawCalls: 0, uploads: 0, uploadBytes: 0, solidBoxes: 0, transparentBoxes: 0, outlineBoxes: 0, lineVertices: 0, glyphs: 0, flowPulses: 0 };
     this._persistentUniforms = null;
     this._persistentBuffers = null;
-    this._persistentCounts = { solidBoxes: 0, outlineBoxes: 0, lineVertices: 0, glyphs: 0, flowPulses: 0 };
+    this._persistentCounts = { solidBoxes: 0, transparentBoxes: 0, outlineBoxes: 0, lineVertices: 0, glyphs: 0, flowPulses: 0 };
     this._persistentResident = false;
     this.initBoxes();
     this.initFlow();
@@ -176,12 +182,15 @@ class WebGLBatchRenderer {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.boxInstanceBuffer);
-    const stride = 9 * 4;
-    for (let attr = 1; attr <= 3; attr++) {
+    const stride = 10 * 4;
+    for (let attr = 1; attr <= 2; attr++) {
       gl.enableVertexAttribArray(attr);
       gl.vertexAttribPointer(attr, 3, gl.FLOAT, false, stride, (attr - 1) * 3 * 4);
       gl.vertexAttribDivisor(attr, 1);
     }
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 6 * 4);
+    gl.vertexAttribDivisor(3, 1);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.boxFaceIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.boxFaces, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.boxEdgeIndexBuffer);
@@ -280,7 +289,7 @@ class WebGLBatchRenderer {
     this.stats.uploadBytes += data.byteLength;
   }
 
-  drawBoxes(data, count, outline, vp) {
+  drawBoxes(data, count, outline, vp, transparent = false) {
     if (!count) return;
     const gl = this.gl;
     gl.useProgram(this.boxProgram);
@@ -288,7 +297,16 @@ class WebGLBatchRenderer {
     gl.bindVertexArray(this.boxVao);
     this.upload(this.boxInstanceBuffer, data);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, outline ? this.boxEdgeIndexBuffer : this.boxFaceIndexBuffer);
+    if (transparent) {
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.depthMask(false);
+    }
     gl.drawElementsInstanced(outline ? gl.LINES : gl.TRIANGLES, outline ? this.boxEdges.length : this.boxFaces.length, gl.UNSIGNED_SHORT, 0, count);
+    if (transparent) {
+      gl.depthMask(true);
+      gl.disable(gl.BLEND);
+    }
     this.stats.drawCalls += 1;
   }
 
@@ -340,6 +358,7 @@ class WebGLBatchRenderer {
     const gl = this.gl;
     this.drawLines(snapshot.lines, snapshot.counts.lineVertices, snapshot.viewProjection);
     this.drawBoxes(snapshot.solidBoxes, snapshot.counts.solidBoxes, false, snapshot.viewProjection);
+    this.drawBoxes(snapshot.transparentBoxes, snapshot.counts.transparentBoxes, false, snapshot.viewProjection, true);
     this.drawBoxes(snapshot.outlineBoxes, snapshot.counts.outlineBoxes, true, snapshot.viewProjection);
     this.drawFlow(snapshot.flowPulses, snapshot.counts.flowPulses, snapshot.viewProjection, nowSeconds);
     this.drawText(snapshot.glyphs, snapshot.counts.glyphs, snapshot.viewProjection, cameraRight, cameraUp);
@@ -367,7 +386,7 @@ class WebGLBatchRenderer {
   persistentBuffers() {
     if (this._persistentBuffers) return this._persistentBuffers;
     const gl = this.gl;
-    this._persistentBuffers = { solidBoxes: gl.createBuffer(), outlineBoxes: gl.createBuffer() };
+    this._persistentBuffers = { solidBoxes: gl.createBuffer(), transparentBoxes: gl.createBuffer(), outlineBoxes: gl.createBuffer() };
     return this._persistentBuffers;
   }
 
@@ -375,12 +394,15 @@ class WebGLBatchRenderer {
     const gl = this.gl;
     gl.bindVertexArray(this.boxVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
-    const stride = 9 * 4;
-    for (let attr = 1; attr <= 3; attr++) {
+    const stride = 10 * 4;
+    for (let attr = 1; attr <= 2; attr++) {
       gl.enableVertexAttribArray(attr);
       gl.vertexAttribPointer(attr, 3, gl.FLOAT, false, stride, (attr - 1) * 3 * 4);
       gl.vertexAttribDivisor(attr, 1);
     }
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 6 * 4);
+    gl.vertexAttribDivisor(3, 1);
   }
 
   commitPersistent() {
@@ -389,6 +411,7 @@ class WebGLBatchRenderer {
     this.stats.uploads = 0;
     this.stats.uploadBytes = 0;
     if (snapshot.counts.solidBoxes) this.upload(buffers.solidBoxes, snapshot.solidBoxes, this.gl.STATIC_DRAW);
+    if (snapshot.counts.transparentBoxes) this.upload(buffers.transparentBoxes, snapshot.transparentBoxes, this.gl.STATIC_DRAW);
     if (snapshot.counts.outlineBoxes) this.upload(buffers.outlineBoxes, snapshot.outlineBoxes, this.gl.STATIC_DRAW);
     if (snapshot.counts.lineVertices) this.upload(this.lineBuffer, snapshot.lines, this.gl.STATIC_DRAW);
     if (snapshot.counts.flowPulses) this.upload(this.flowInstanceBuffer, snapshot.flowPulses, this.gl.STATIC_DRAW);
@@ -422,6 +445,19 @@ class WebGLBatchRenderer {
       this.bindBoxInstances(buffers.solidBoxes);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.boxFaceIndexBuffer);
       gl.drawElementsInstanced(gl.TRIANGLES, this.boxFaces.length, gl.UNSIGNED_SHORT, 0, counts.solidBoxes);
+      this.stats.drawCalls += 1;
+    }
+    if (counts.transparentBoxes) {
+      gl.useProgram(this.boxProgram);
+      gl.uniformMatrix4fv(loc.boxVp, false, new Float32Array(viewProjection));
+      this.bindBoxInstances(buffers.transparentBoxes);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.boxFaceIndexBuffer);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.depthMask(false);
+      gl.drawElementsInstanced(gl.TRIANGLES, this.boxFaces.length, gl.UNSIGNED_SHORT, 0, counts.transparentBoxes);
+      gl.depthMask(true);
+      gl.disable(gl.BLEND);
       this.stats.drawCalls += 1;
     }
     if (counts.outlineBoxes) {
