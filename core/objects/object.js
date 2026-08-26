@@ -22,6 +22,25 @@ class SceneObject {
     this.children = [];
     this.anchors = new Map();
     this.scene = null;
+    this.listeners = new Map();
+  }
+  on(event, listener) {
+    if (typeof listener !== 'function') throw new Error('SceneObject listener must be a function');
+    const values = this.listeners.get(event) ?? new Set();
+    values.add(listener);
+    this.listeners.set(event, values);
+    return () => values.delete(listener);
+  }
+  emit(event, detail = {}) {
+    const payload = { type: event, target: this, ...detail };
+    for (const listener of this.listeners.get(event) ?? []) listener(payload);
+    return payload;
+  }
+  setPosition(position, { emit = true } = {}) {
+    const previous = [...this.position];
+    this.position = vec3(position, this.position);
+    if (emit) this.emit('positionChanged', { previous, position: [...this.position] });
+    return this;
   }
   add(child) {
     if (!(child instanceof SceneObject)) throw new Error('SceneObject child must be a SceneObject');
@@ -53,6 +72,11 @@ class SceneObject {
   anchor(name) { return this.anchors.get(name) ?? null; }
   update() {}
   draw() {}
+  destroy() {
+    if (this.parent) this.parent.remove(this);
+    if (this.scene) this.scene.remove(this);
+    this.listeners.clear();
+  }
 }
 
 class Group extends SceneObject {
