@@ -15,3 +15,5 @@ import { FrequencyRangeController } from './domains/acoustics/index.js';
 ```
 
 Applications own instances, project state and wiring. See `Contracts/` for the architectural invariants.
+
+Core interaction includes full-3D object picking, horizontal plane dragging and modifier-driven vertical dragging. The acoustics domain includes independently instantiable single-plane and orthogonal three-plane sampled field views.

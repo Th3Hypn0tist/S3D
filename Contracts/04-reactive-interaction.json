@@ -3,6 +3,8 @@
   "scope": "S3D/core + domains",
   "rules": [
     "draggable objects emit position changes continuously during pointer movement",
+    "generic drag interaction can move objects horizontally or vertically",
+    "3D picking uses the object position rather than a fixed floor-plane projection",
     "consumers can invalidate dependent calculations on every position change",
     "reactive views recompute at most once per animation frame",
     "pointer release is not required before a dependent visualization updates",
