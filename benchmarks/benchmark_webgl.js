@@ -1,5 +1,5 @@
 // WebGL2 high-density benchmark harness.
-import { Vec3, Mat4 } from './math.js';
+import { Vec3, Mat4 } from '../core/math.js';
 import { Benchmark, FrameMetrics } from './benchmark.js';
 
 function shader(gl, type, source) {

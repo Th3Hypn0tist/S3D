@@ -1,0 +1,15 @@
+{
+  "name": "S3D",
+  "version": "0.3.0",
+  "kind": "standalone structural 3D framework",
+  "runtime": "browser",
+  "principles": [
+    "structural 3D is the primary framework purpose",
+    "all stateful functionality is instantiable",
+    "no application singleton state",
+    "core is host-independent",
+    "reusable domain concepts are allowed",
+    "domain modules are first-class framework modules, not extras",
+    "rendering backends do not own host-domain meaning"
+  ]
+}

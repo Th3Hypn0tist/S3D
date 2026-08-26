@@ -1,0 +1,22 @@
+{
+  "layers": {
+    "core": "domain-independent structural runtime, objects, math and rendering",
+    "domains": "reusable instantiable implementations organized by domain",
+    "host": "application instances, project state, wiring and host-specific workflows"
+  },
+  "allowedDependencies": [
+    "domains/* -> core",
+    "host -> core",
+    "host -> domains/*"
+  ],
+  "forbiddenDependencies": [
+    "core -> domains/*",
+    "core -> host",
+    "domains/* -> host"
+  ],
+  "invariants": [
+    "core never imports a domain module",
+    "domain modules remain independently importable",
+    "domain terminology is allowed when the implementation is reusable outside its originating application"
+  ]
+}

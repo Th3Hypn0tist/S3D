@@ -1,0 +1,15 @@
+{
+  "name": "@th3hypn0tist/s3d",
+  "version": "0.3.0",
+  "type": "module",
+  "exports": {
+    ".": "./s3d.js",
+    "./core": "./core/index.js",
+    "./domains/acoustics": "./domains/acoustics/index.js",
+    "./benchmarks": "./benchmarks/benchmark.js",
+    "./benchmarks/webgl": "./benchmarks/benchmark_webgl.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}
