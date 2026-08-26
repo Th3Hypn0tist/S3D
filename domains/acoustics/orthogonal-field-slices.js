@@ -8,7 +8,7 @@ const definitions = Object.freeze({
 });
 
 class OrthogonalFieldSlices extends SceneObject {
-  constructor({ id, field, bounds, slices = null, counts = {}, resolution = {}, thickness = .018, opacity = .28, color = defaultColor, metadata = {} } = {}) {
+  constructor({ id, field, bounds, slices = null, counts = {}, resolution = {}, thickness = .018, opacity = .28, opacities = {}, color = defaultColor, metadata = {} } = {}) {
     super({ id, selectable: false, metadata });
     if (!field) throw new Error('OrthogonalFieldSlices requires a field function or sampleable object');
     if (!bounds?.min || !bounds?.max) throw new Error('OrthogonalFieldSlices requires min/max volume bounds');
@@ -23,6 +23,11 @@ class OrthogonalFieldSlices extends SceneObject {
     this.counts = { x: 1, y: 1, z: 1, ...counts };
     this.thickness = Number(thickness);
     this.opacity = this.validateOpacity(opacity);
+    this.opacities = {
+      x: this.validateOpacity(opacities.x ?? this.opacity),
+      y: this.validateOpacity(opacities.y ?? this.opacity),
+      z: this.validateOpacity(opacities.z ?? this.opacity),
+    };
     this.color = color;
     this.samples = [];
     this.dirty = true;
@@ -59,7 +64,16 @@ class OrthogonalFieldSlices extends SceneObject {
   setBounds(bounds) { this.bounds = { min: [...bounds.min], max: [...bounds.max] }; return this.invalidate(); }
   setSlice(axis, value) { this.slices[axis] = this.validateSlice(axis, value); return this.invalidate(); }
   setSliceCount(axis, value) { this.counts[axis] = this.validateCount(axis, value); return this.invalidate(); }
-  setOpacity(value) { this.opacity = this.validateOpacity(value); return this.invalidate(); }
+  setOpacity(value) {
+    this.opacity = this.validateOpacity(value);
+    for (const axis of Object.keys(definitions)) this.opacities[axis] = this.opacity;
+    return this.invalidate();
+  }
+  setAxisOpacity(axis, value) {
+    if (!definitions[axis]) throw new Error(`Unknown slice axis: ${axis}`);
+    this.opacities[axis] = this.validateOpacity(value);
+    return this.invalidate();
+  }
   setResolution(name, value) { this.resolution[name] = [...value]; return this.invalidate(); }
   invalidate() { this.dirty = true; return this; }
   sample(position) { return typeof this.field === 'function' ? this.field(...position) : this.field.sample(...position); }
@@ -109,7 +123,7 @@ class OrthogonalFieldSlices extends SceneObject {
     const span = Math.max(1e-12, high - low);
     this.samples = raw.map(sample => {
       const color = this.color((sample.value - low) / span, sample.value, low, high);
-      return { ...sample, color: [color[0], color[1], color[2], this.opacity] };
+      return { ...sample, color: [color[0], color[1], color[2], this.opacities[sample.axis]] };
     });
     this.range = [low, high];
     this.dirty = false;
