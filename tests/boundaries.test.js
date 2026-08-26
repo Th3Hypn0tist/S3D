@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { PerspectiveCamera } from '../core/index.js';
+import { RenderStore } from '../core/render_store.js';
 import { distanceFromRay, intersectPlane } from '../core/interaction/plane-drag-controller.js';
 import { FrequencyRangeController, OrthogonalFieldSlices, SpeakerNode, SampledFieldPlane } from '../domains/acoustics/index.js';
 
@@ -76,4 +77,35 @@ test('orthogonal field slices sample the X, Y and Z planes with one shared range
   assert.ok(field.range[1] > field.range[0]);
   field.setSlice('y', 2);
   assert.equal(field.dirty, true);
+});
+
+test('orthogonal field slices distribute transparent slices by axis count', () => {
+  const field = new OrthogonalFieldSlices({
+    id: 'multi-slices',
+    field: (x, y, z) => x + y + z,
+    bounds: { min: [0, 0, 0], max: [4, 3, 2] },
+    counts: { x: 2, y: 3, z: 0 },
+    resolution: { xz: [2, 2], xy: [2, 2], yz: [2, 2] },
+    opacity: .35,
+  });
+  field.update();
+  assert.equal(field.samples.length, 20);
+  assert.deepEqual([...new Set(field.samples.filter(sample => sample.axis === 'x').map(sample => sample.slice))], [4 / 3, 8 / 3]);
+  assert.deepEqual([...new Set(field.samples.filter(sample => sample.axis === 'y').map(sample => sample.slice))], [.75, 1.5, 2.25]);
+  assert.equal(field.samples.some(sample => sample.axis === 'z'), false);
+  assert.ok(field.samples.every(sample => sample.color[3] === .35));
+  field.setSliceCount('z', 2);
+  assert.equal(field.dirty, true);
+});
+
+test('render store routes alpha boxes into a transparent RGBA batch', () => {
+  const store = new RenderStore();
+  store.begin(new Float32Array(16));
+  store.box([0, 0, 0], [1, 1, 1], [1, .5, 0, .25]);
+  store.box([0, 0, 0], [1, 1, 1], [0, 1, 0]);
+  const snapshot = store.snapshot();
+  assert.equal(snapshot.counts.transparentBoxes, 1);
+  assert.equal(snapshot.counts.solidBoxes, 1);
+  assert.equal(snapshot.transparentBoxes.length, 10);
+  assert.ok(Math.abs(snapshot.transparentBoxes[9] - .25) < 1e-6);
 });

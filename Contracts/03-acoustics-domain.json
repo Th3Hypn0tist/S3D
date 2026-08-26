@@ -9,7 +9,7 @@
     "speaker visualization",
     "continuously draggable speaker nodes",
     "reactive sampled acoustic field views",
-    "orthogonal field slices with a shared value range",
+    "transparent orthogonal field slices with per-axis slice counts and a shared value range",
     "reusable acoustic computation when its contract is host-independent"
   ],
   "mustNot": [
