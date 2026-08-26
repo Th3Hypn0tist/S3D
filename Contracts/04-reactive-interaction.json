@@ -1,0 +1,12 @@
+{
+  "module": "ReactiveInteraction",
+  "scope": "S3D/core + domains",
+  "rules": [
+    "draggable objects emit position changes continuously during pointer movement",
+    "consumers can invalidate dependent calculations on every position change",
+    "reactive views recompute at most once per animation frame",
+    "pointer release is not required before a dependent visualization updates",
+    "preview resolution may be reduced during interaction if full-quality output is restored after interaction",
+    "drag behavior is implemented generically in core and domain objects opt in through instances"
+  ]
+}

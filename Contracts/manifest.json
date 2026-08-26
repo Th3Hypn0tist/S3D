@@ -1,11 +1,12 @@
 {
   "package": "s3d-contracts",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "files": [
     "00-framework-contract.json",
     "01-core-domain-boundary.json",
     "02-module-contract.json",
     "03-acoustics-domain.json",
+    "04-reactive-interaction.json",
     "manifest.json"
   ],
   "status": "active"

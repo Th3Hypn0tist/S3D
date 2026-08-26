@@ -7,6 +7,8 @@
     "acoustic field visualization",
     "room and measurement visualization",
     "speaker visualization",
+    "continuously draggable speaker nodes",
+    "reactive sampled acoustic field views",
     "reusable acoustic computation when its contract is host-independent"
   ],
   "mustNot": [

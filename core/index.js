@@ -6,6 +6,10 @@ import { Vec3, Mat4 } from './math.js';
 import { Renderer } from './renderer.js';
 import { FloatStore, RenderStore } from './render_store.js';
 import { GlyphAtlas, WebGLBatchRenderer } from './webgl_batch_renderer.js';
+import { PerspectiveCamera } from './camera.js';
+import { Viewport } from './viewport.js';
+import { OrbitControls } from './interaction/orbit-controls.js';
+import { PlaneDragController } from './interaction/plane-drag-controller.js';
 import { SceneObject, Group } from './objects/object.js';
 import { Primitive, Box, Point } from './objects/primitives.js';
 import { Anchor } from './objects/anchors.js';
@@ -30,6 +34,10 @@ const S3D = Object.freeze({
   RenderStore,
   GlyphAtlas,
   WebGLBatchRenderer,
+  PerspectiveCamera,
+  Viewport,
+  OrbitControls,
+  PlaneDragController,
   SceneObject,
   Group,
   Primitive,
@@ -59,6 +67,10 @@ export {
   RenderStore,
   GlyphAtlas,
   WebGLBatchRenderer,
+  PerspectiveCamera,
+  Viewport,
+  OrbitControls,
+  PlaneDragController,
   SceneObject,
   Group,
   Primitive,
