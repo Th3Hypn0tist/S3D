@@ -6,8 +6,6 @@ import { Vec3, Mat4 } from './math.js';
 import { Renderer } from './renderer.js';
 import { FloatStore, RenderStore } from './render_store.js';
 import { GlyphAtlas, WebGLBatchRenderer } from './webgl_batch_renderer.js';
-import { BENCHMARK_PRESETS, Benchmark, FrameMetrics } from './benchmark.js';
-import { WebGLBenchmark } from './benchmark_webgl.js';
 import { SceneObject, Group } from './objects/object.js';
 import { Primitive, Box, Point } from './objects/primitives.js';
 import { Anchor } from './objects/anchors.js';
@@ -32,8 +30,6 @@ const S3D = Object.freeze({
   RenderStore,
   GlyphAtlas,
   WebGLBatchRenderer,
-  Benchmark,
-  WebGLBenchmark,
   SceneObject,
   Group,
   Primitive,
@@ -63,10 +59,6 @@ export {
   RenderStore,
   GlyphAtlas,
   WebGLBatchRenderer,
-  BENCHMARK_PRESETS,
-  Benchmark,
-  FrameMetrics,
-  WebGLBenchmark,
   SceneObject,
   Group,
   Primitive,
