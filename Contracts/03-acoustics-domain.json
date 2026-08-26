@@ -10,9 +10,9 @@
     "reusable acoustic computation when its contract is host-independent"
   ],
   "mustNot": [
-    "depend on AcousticMate",
-    "own AcousticMate project state",
-    "encode an AcousticMate workflow",
+    "depend on a consuming application",
+    "own consuming application project state",
+    "encode a consumer-specific workflow",
     "introduce a dependency from core back to acoustics"
   ]
 }
