@@ -77,11 +77,7 @@ class OrthogonalFieldSlices extends SceneObject {
     this.opacities[axis] = this.validateOpacity(value);
     return this.invalidate();
   }
-  setRange(value) {
-    this.valueRange = normalizedRange(value);
-    this.recolor();
-    return this;
-  }
+  setRange(value) { this.valueRange = normalizedRange(value); this.recolor(); return this; }
   setResolution(name, value) { this.resolution[name] = [...value]; return this.invalidate(); }
   invalidate() { this.dirty = true; return this; }
   sample(position) { return typeof this.field === 'function' ? this.field(...position) : this.field.sample(...position); }
@@ -149,10 +145,8 @@ class OrthogonalFieldSlices extends SceneObject {
     this.dirty = false;
   }
 
-  update() { if (this.dirty) this.rebuild(); }
-  draw(renderer, context = {}) {
-    for (const sample of this.samples) renderer?.box?.(sample.position, sample.scale, sample.color, false, this, context);
-  }
+  update() { if (this.visible !== false && this.dirty) this.rebuild(); }
+  draw(renderer, context = {}) { for (const sample of this.samples) renderer?.box?.(sample.position, sample.scale, sample.color, false, this, context); }
 }
 
 export { OrthogonalFieldSlices };
