@@ -24,7 +24,7 @@ class SampledFieldPlane extends ScalarFieldView {
   setBounds(bounds) { this.bounds = { min: [...bounds.min], max: [...bounds.max] }; return this.invalidate(); }
   setResolution(value) { this.resolution = [...value]; return this.invalidate(); }
   invalidate() { this.dirty = true; return this; }
-  sample(x, y, z) { return typeof this.field === 'function' ? this.field(x, y, z) : this.field.sample(x, y, z); }
+  sample(x, y, z) { return this.sampleField([x, y, z]); }
 
   recolor() {
     if (!this.samples.length) { this.range = this.valueRange ? [...this.valueRange] : [...this.sampleRange]; return this; }
