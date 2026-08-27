@@ -36,16 +36,9 @@ class SampledFieldPlane extends SceneObject {
   setField(field) { this.field = field; return this.invalidate(); }
   setBounds(bounds) { this.bounds = { min: [...bounds.min], max: [...bounds.max] }; return this.invalidate(); }
   setResolution(value) { this.resolution = [...value]; return this.invalidate(); }
-  setRange(value) {
-    this.valueRange = normalizedRange(value);
-    this.recolor();
-    return this;
-  }
+  setRange(value) { this.valueRange = normalizedRange(value); this.recolor(); return this; }
   invalidate() { this.dirty = true; return this; }
-
-  sample(x, y, z) {
-    return typeof this.field === 'function' ? this.field(x, y, z) : this.field.sample(x, y, z);
-  }
+  sample(x, y, z) { return typeof this.field === 'function' ? this.field(x, y, z) : this.field.sample(x, y, z); }
 
   recolor() {
     if (!this.samples.length) {
@@ -77,21 +70,14 @@ class SampledFieldPlane extends SceneObject {
       high = Math.max(high, finite);
       raw.push({ x, z, value: finite });
     }
-    this.samples = raw.map(({ x, z, value }) => ({
-      position: [x, min[1], z],
-      scale: [dx * .49, this.height, dz * .49],
-      color: [0, 0, 0],
-      value,
-    }));
+    this.samples = raw.map(({ x, z, value }) => ({ position: [x, min[1], z], scale: [dx * .49, this.height, dz * .49], color: [0, 0, 0], value }));
     this.sampleRange = [low, high];
     this.recolor();
     this.dirty = false;
   }
 
-  update() { if (this.dirty) this.rebuild(); }
-  draw(renderer, context = {}) {
-    for (const sample of this.samples) renderer?.box?.(sample.position, sample.scale, sample.color, false, this, context);
-  }
+  update() { if (this.visible !== false && this.dirty) this.rebuild(); }
+  draw(renderer, context = {}) { for (const sample of this.samples) renderer?.box?.(sample.position, sample.scale, sample.color, false, this, context); }
 }
 
 export { SampledFieldPlane, defaultColor, normalizedRange };
