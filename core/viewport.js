@@ -1,4 +1,4 @@
-import { WebGLBatchRenderer } from './webgl_batch_renderer.js';
+import { WebGLImageRenderer } from './webgl_image_renderer.js';
 
 class Viewport {
   constructor(canvas, { camera, clearColor = [.025, .03, .045, 1], pixelRatio = () => globalThis.devicePixelRatio || 1 } = {}) {
@@ -10,7 +10,7 @@ class Viewport {
     this.pixelRatio = pixelRatio;
     this.gl = canvas.getContext('webgl2', { antialias: true, alpha: false, depth: true });
     if (!this.gl) throw new Error('Viewport requires WebGL2');
-    this.renderer = new WebGLBatchRenderer(this.gl);
+    this.renderer = new WebGLImageRenderer(this.gl);
     this.scene = null;
     this.running = false;
     this.frameHandle = null;
