@@ -1,5 +1,5 @@
 import { SceneObject } from '../../core/objects/object.js';
-import { defaultColor } from './sampled-field-plane.js';
+import { defaultColor, normalizedRange } from './sampled-field-plane.js';
 
 const definitions = Object.freeze({
   x: { axes: [2, 1], fixed: 0, resolution: 'yz' },
@@ -8,7 +8,7 @@ const definitions = Object.freeze({
 });
 
 class OrthogonalFieldSlices extends SceneObject {
-  constructor({ id, field, bounds, slices = null, counts = {}, resolution = {}, thickness = .018, opacity = .28, opacities = {}, color = defaultColor, metadata = {} } = {}) {
+  constructor({ id, field, bounds, slices = null, counts = {}, resolution = {}, thickness = .018, opacity = .28, opacities = {}, color = defaultColor, range = null, metadata = {} } = {}) {
     super({ id, selectable: false, metadata });
     if (!field) throw new Error('OrthogonalFieldSlices requires a field function or sampleable object');
     if (!bounds?.min || !bounds?.max) throw new Error('OrthogonalFieldSlices requires min/max volume bounds');
@@ -29,6 +29,9 @@ class OrthogonalFieldSlices extends SceneObject {
       z: this.validateOpacity(opacities.z ?? this.opacity),
     };
     this.color = color;
+    this.valueRange = normalizedRange(range);
+    this.sampleRange = [0, 0];
+    this.range = this.valueRange ? [...this.valueRange] : [0, 0];
     this.samples = [];
     this.dirty = true;
     for (const axis of Object.keys(definitions)) {
@@ -74,6 +77,11 @@ class OrthogonalFieldSlices extends SceneObject {
     this.opacities[axis] = this.validateOpacity(value);
     return this.invalidate();
   }
+  setRange(value) {
+    this.valueRange = normalizedRange(value);
+    this.recolor();
+    return this;
+  }
   setResolution(name, value) { this.resolution[name] = [...value]; return this.invalidate(); }
   invalidate() { this.dirty = true; return this; }
   sample(position) { return typeof this.field === 'function' ? this.field(...position) : this.field.sample(...position); }
@@ -105,27 +113,39 @@ class OrthogonalFieldSlices extends SceneObject {
       scale[uAxis] = du * .49;
       scale[vAxis] = dv * .49;
       const value = Number(this.sample(position));
-      samples.push({ axis, slice: fixedPosition, position, scale, value: Number.isFinite(value) ? value : 0 });
+      samples.push({ axis, slice: fixedPosition, position, scale, value: Number.isFinite(value) ? value : 0, color: [0, 0, 0, this.opacities[axis]] });
     }
     return samples;
   }
 
+  recolor() {
+    if (!this.samples.length) {
+      this.range = this.valueRange ? [...this.valueRange] : [...this.sampleRange];
+      return this;
+    }
+    const [low, high] = this.valueRange ?? this.sampleRange;
+    const span = Math.max(1e-12, high - low);
+    for (const sample of this.samples) {
+      const color = this.color((sample.value - low) / span, sample.value, low, high);
+      sample.color = [color[0], color[1], color[2], this.opacities[sample.axis]];
+    }
+    this.range = [low, high];
+    return this;
+  }
+
   rebuild() {
-    const raw = Object.keys(definitions).flatMap(axis => this.slicePositions(axis).flatMap(position => this.sampleSlice(axis, position)));
-    if (!raw.length) {
-      this.samples = [];
-      this.range = [0, 0];
+    this.samples = Object.keys(definitions).flatMap(axis => this.slicePositions(axis).flatMap(position => this.sampleSlice(axis, position)));
+    if (!this.samples.length) {
+      this.sampleRange = [0, 0];
+      this.recolor();
       this.dirty = false;
       return;
     }
-    const low = Math.min(...raw.map(sample => sample.value));
-    const high = Math.max(...raw.map(sample => sample.value));
-    const span = Math.max(1e-12, high - low);
-    this.samples = raw.map(sample => {
-      const color = this.color((sample.value - low) / span, sample.value, low, high);
-      return { ...sample, color: [color[0], color[1], color[2], this.opacities[sample.axis]] };
-    });
-    this.range = [low, high];
+    this.sampleRange = [
+      Math.min(...this.samples.map(sample => sample.value)),
+      Math.max(...this.samples.map(sample => sample.value)),
+    ];
+    this.recolor();
     this.dirty = false;
   }
 
