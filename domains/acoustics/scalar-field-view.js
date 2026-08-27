@@ -16,7 +16,7 @@ function normalizedFrequencyRange(value) {
   if (!Array.isArray(value) || value.length !== 2) throw new Error('Frequency range must be [minHz,maxHz] or null');
   const minHz = Number(value[0]);
   const maxHz = Number(value[1]);
-  if (!Number.isFinite(minHz) || !Number.isFinite(maxHz) || minHz < 0 || maxHz <= minHz) throw new Error('Frequency range requires 0 <= minHz < maxHz');
+  if (!Number.isFinite(minHz) || !Number.isFinite(maxHz) || minHz < 0 || maxHz < minHz) throw new Error('Frequency range requires 0 <= minHz <= maxHz');
   return [minHz, maxHz];
 }
 
@@ -57,54 +57,12 @@ class ScalarFieldView extends SceneObject {
     this.frequencySampleCount = Math.max(1, Math.floor(Number(frequencySampleCount) || 12));
   }
 
-  setField(field) {
-    if (!field) throw new Error('ScalarFieldView requires a field');
-    this.field = field;
-    this.invalidate?.();
-    return this;
-  }
-
-  setFrequency(value) {
-    const next = value == null ? null : Number(value);
-    if (next != null && (!Number.isFinite(next) || next < 0)) throw new Error('ScalarFieldView frequency must be non-negative or null');
-    const previous = this.frequency;
-    this.frequency = next;
-    this.invalidate?.();
-    this.emit('frequencyChanged', { previous, frequency: next });
-    return this;
-  }
-
-  setFrequencyRange(value, maxHz = undefined) {
-    const next = maxHz === undefined ? normalizedFrequencyRange(value) : normalizedFrequencyRange([value, maxHz]);
-    const previous = this.frequencyRange ? [...this.frequencyRange] : null;
-    this.frequencyRange = next;
-    this.invalidate?.();
-    this.emit('frequencyRangeChanged', { previous, frequencyRange: next ? [...next] : null });
-    return this;
-  }
-
-  setAggregation(value) {
-    if (!FIELD_AGGREGATIONS.includes(value)) throw new Error(`Unsupported field aggregation: ${value}`);
-    const previous = this.aggregation;
-    this.aggregation = value;
-    this.invalidate?.();
-    this.emit('aggregationChanged', { previous, aggregation: value });
-    return this;
-  }
-
-  setFrequencySampleCount(value) {
-    value = Math.floor(Number(value));
-    if (!Number.isInteger(value) || value < 1) throw new Error('Frequency sample count must be a positive integer');
-    this.frequencySampleCount = value;
-    this.invalidate?.();
-    return this;
-  }
-
-  setRange(value) {
-    this.valueRange = normalizedRange(value);
-    this.recolor?.();
-    return this;
-  }
+  setField(field) { if (!field) throw new Error('ScalarFieldView requires a field'); this.field = field; this.invalidate?.(); return this; }
+  setFrequency(value) { const next = value == null ? null : Number(value); if (next != null && (!Number.isFinite(next) || next < 0)) throw new Error('ScalarFieldView frequency must be non-negative or null'); const previous = this.frequency; this.frequency = next; this.invalidate?.(); this.emit('frequencyChanged', { previous, frequency: next }); return this; }
+  setFrequencyRange(value, maxHz = undefined) { const next = maxHz === undefined ? normalizedFrequencyRange(value) : normalizedFrequencyRange([value, maxHz]); const previous = this.frequencyRange ? [...this.frequencyRange] : null; this.frequencyRange = next; this.invalidate?.(); this.emit('frequencyRangeChanged', { previous, frequencyRange: next ? [...next] : null }); return this; }
+  setAggregation(value) { if (!FIELD_AGGREGATIONS.includes(value)) throw new Error(`Unsupported field aggregation: ${value}`); const previous = this.aggregation; this.aggregation = value; this.invalidate?.(); this.emit('aggregationChanged', { previous, aggregation: value }); return this; }
+  setFrequencySampleCount(value) { value = Math.floor(Number(value)); if (!Number.isInteger(value) || value < 1) throw new Error('Frequency sample count must be a positive integer'); this.frequencySampleCount = value; this.invalidate?.(); return this; }
+  setRange(value) { this.valueRange = normalizedRange(value); this.recolor?.(); return this; }
 
   sampleFieldAtFrequency(position, frequencyHz) {
     const field = this.field;
@@ -116,8 +74,7 @@ class ScalarFieldView extends SceneObject {
 
   sampleField(position) {
     if (this.aggregation !== 'single' && this.frequencyRange) {
-      const values = frequencySamples(this.frequencyRange, this.frequencySampleCount)
-        .map(frequencyHz => this.sampleFieldAtFrequency(position, frequencyHz));
+      const values = frequencySamples(this.frequencyRange, this.frequencySampleCount).map(frequencyHz => this.sampleFieldAtFrequency(position, frequencyHz));
       return aggregateValues(values, this.aggregation);
     }
     if (this.frequency != null) return this.sampleFieldAtFrequency(position, this.frequency);
@@ -132,12 +89,4 @@ class ScalarFieldView extends SceneObject {
   destroy() { super.destroy(); }
 }
 
-export {
-  ScalarFieldView,
-  FIELD_AGGREGATIONS,
-  normalizedRange,
-  normalizedFrequencyRange,
-  scalarMagnitude,
-  frequencySamples,
-  aggregateValues,
-};
+export { ScalarFieldView, FIELD_AGGREGATIONS, normalizedRange, normalizedFrequencyRange, scalarMagnitude, frequencySamples, aggregateValues };
