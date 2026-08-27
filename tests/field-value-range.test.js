@@ -30,3 +30,34 @@ test('OrthogonalFieldSlices exposes sample range separately from the shared disp
   assert.deepEqual(view.range, [0, 12]);
   assert.equal(view.dirty, false);
 });
+
+test('increasing slice count preserves all previously visible slice positions', () => {
+  const view = new OrthogonalFieldSlices({
+    field,
+    bounds: { min: [0, 0, 0], max: [8, 4, 6] },
+    counts: { x: 2, y: 0, z: 0 },
+    resolution: { yz: [2, 2] },
+  });
+  const two = view.slicePositions('x');
+  view.setSliceCount('x', 3);
+  const three = view.slicePositions('x');
+  assert.deepEqual(three.slice(0, two.length), two);
+  assert.equal(new Set(three).size, 3);
+});
+
+test('increasing slice count samples only newly added slices when field state is unchanged', () => {
+  let sampleCount = 0;
+  const countedField = { sample: (x, y, z) => { sampleCount += 1; return x + y + z; } };
+  const view = new OrthogonalFieldSlices({
+    field: countedField,
+    bounds: { min: [0, 0, 0], max: [8, 4, 6] },
+    counts: { x: 2, y: 0, z: 0 },
+    resolution: { yz: [2, 2] },
+  });
+  view.rebuild();
+  const firstPass = sampleCount;
+  assert.equal(firstPass, 8);
+  view.setSliceCount('x', 3);
+  view.rebuild();
+  assert.equal(sampleCount - firstPass, 4);
+});
