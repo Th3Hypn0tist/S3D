@@ -33,6 +33,18 @@ class Measurement {
   }
 }
 
+function polygonEdges(polygon) {
+  const vertices = polygon?.vertices ?? [];
+  const count = vertices.length;
+  if (count < 2) return [];
+  const edgeCount = polygon?.closed ? count : count - 1;
+  return Array.from({ length: edgeCount }, (_, index) => {
+    const start = vertices[index];
+    const end = vertices[(index + 1) % count];
+    return { id: `edge:${start.id}:${end.id}`, start, end };
+  });
+}
+
 function resolveAnchor(anchorValue, polygon) {
   const value = anchor(anchorValue);
   const vertices = polygon?.vertices ?? [];
@@ -45,7 +57,8 @@ function resolveAnchor(anchorValue, polygon) {
     if (!vertex) throw new Error(`Unknown measurement vertex anchor: ${value.target}`);
     return [vertex.x, vertex.z];
   }
-  const edge = (polygon?.edges?.() ?? []).find(item => item.id === value.target) ?? null;
+  const edges = typeof polygon?.edges === 'function' ? polygon.edges() : polygonEdges(polygon);
+  const edge = edges.find(item => item.id === value.target) ?? null;
   if (!edge) throw new Error(`Unknown measurement edge anchor: ${value.target}`);
   const t = Math.max(0, Math.min(1, Number(value.t ?? .5)));
   return [edge.start.x + (edge.end.x - edge.start.x) * t, edge.start.z + (edge.end.z - edge.start.z) * t];
