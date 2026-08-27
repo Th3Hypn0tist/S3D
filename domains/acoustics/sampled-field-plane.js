@@ -1,4 +1,4 @@
-import { SceneObject } from '../../core/objects/object.js';
+import { ScalarFieldView, normalizedRange } from './scalar-field-view.js';
 
 function defaultColor(value) {
   const t = Math.max(0, Math.min(1, value));
@@ -7,44 +7,27 @@ function defaultColor(value) {
   return [.2 + .8 * u, .78 - .55 * u, 1 - .9 * u];
 }
 
-function normalizedRange(value) {
-  if (value == null) return null;
-  if (!Array.isArray(value) || value.length !== 2) throw new Error('Field value range must be [min,max] or null');
-  const low = Number(value[0]);
-  const high = Number(value[1]);
-  if (!Number.isFinite(low) || !Number.isFinite(high) || high < low) throw new Error('Field value range requires finite min <= max');
-  return [low, high];
-}
-
-class SampledFieldPlane extends SceneObject {
-  constructor({ id, field, bounds, resolution = [36, 28], height = .025, color = defaultColor, range = null, metadata = {} } = {}) {
-    super({ id, selectable: false, metadata });
-    if (!field) throw new Error('SampledFieldPlane requires a field function or sampleable object');
+class SampledFieldPlane extends ScalarFieldView {
+  constructor({ id, field, bounds, resolution = [36, 28], height = .025, color = defaultColor, range = null, frequency = null, frequencyRange = null, aggregation = 'single', metadata = {} } = {}) {
+    super({ id, field, range, frequency, frequencyRange, aggregation, selectable: false, metadata });
     if (!bounds?.min || !bounds?.max) throw new Error('SampledFieldPlane requires min/max bounds');
-    this.field = field;
     this.bounds = { min: [...bounds.min], max: [...bounds.max] };
     this.resolution = [...resolution];
     this.height = Number(height);
     this.color = color;
-    this.valueRange = normalizedRange(range);
     this.sampleRange = [0, 0];
     this.range = this.valueRange ? [...this.valueRange] : [0, 0];
     this.samples = [];
     this.dirty = true;
   }
 
-  setField(field) { this.field = field; return this.invalidate(); }
   setBounds(bounds) { this.bounds = { min: [...bounds.min], max: [...bounds.max] }; return this.invalidate(); }
   setResolution(value) { this.resolution = [...value]; return this.invalidate(); }
-  setRange(value) { this.valueRange = normalizedRange(value); this.recolor(); return this; }
   invalidate() { this.dirty = true; return this; }
   sample(x, y, z) { return typeof this.field === 'function' ? this.field(x, y, z) : this.field.sample(x, y, z); }
 
   recolor() {
-    if (!this.samples.length) {
-      this.range = this.valueRange ? [...this.valueRange] : [...this.sampleRange];
-      return this;
-    }
+    if (!this.samples.length) { this.range = this.valueRange ? [...this.valueRange] : [...this.sampleRange]; return this; }
     const [low, high] = this.valueRange ?? this.sampleRange;
     const span = Math.max(1e-12, high - low);
     for (const sample of this.samples) sample.color = this.color((sample.value - low) / span, sample.value, low, high);
