@@ -6,6 +6,7 @@ import { Vec3, Mat4 } from './math.js';
 import { Renderer } from './renderer.js';
 import { FloatStore, RenderStore } from './render_store.js';
 import { GlyphAtlas, WebGLBatchRenderer } from './webgl_batch_renderer.js';
+import { WebGLImageRenderer } from './webgl_image_renderer.js';
 import { PerspectiveCamera } from './camera.js';
 import { Viewport } from './viewport.js';
 import { OrbitControls } from './interaction/orbit-controls.js';
@@ -39,6 +40,7 @@ const S3D = Object.freeze({
   RenderStore,
   GlyphAtlas,
   WebGLBatchRenderer,
+  WebGLImageRenderer,
   PerspectiveCamera,
   Viewport,
   OrbitControls,
@@ -78,6 +80,7 @@ export {
   RenderStore,
   GlyphAtlas,
   WebGLBatchRenderer,
+  WebGLImageRenderer,
   PerspectiveCamera,
   Viewport,
   OrbitControls,
