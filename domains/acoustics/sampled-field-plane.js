@@ -1,4 +1,5 @@
 import { ScalarFieldView, normalizedRange } from './scalar-field-view.js';
+import { SpatialSamplingPolicy, viewSamplingFrequency } from './spatial-sampling-policy.js';
 
 function defaultColor(value) {
   const t = Math.max(0, Math.min(1, value));
@@ -8,11 +9,13 @@ function defaultColor(value) {
 }
 
 class SampledFieldPlane extends ScalarFieldView {
-  constructor({ id, field, bounds, resolution = [36, 28], height = .025, color = defaultColor, range = null, frequency = null, frequencyRange = null, aggregation = 'single', metadata = {} } = {}) {
+  constructor({ id, field, bounds, resolution = [36, 28], height = .025, color = defaultColor, range = null, frequency = null, frequencyRange = null, aggregation = 'single', samplingPolicy = null, metadata = {} } = {}) {
     super({ id, field, range, frequency, frequencyRange, aggregation, selectable: false, metadata });
     if (!bounds?.min || !bounds?.max) throw new Error('SampledFieldPlane requires min/max bounds');
     this.bounds = { min: [...bounds.min], max: [...bounds.max] };
     this.resolution = [...resolution];
+    this.samplingPolicy = samplingPolicy ?? new SpatialSamplingPolicy();
+    this.samplingState = null;
     this.height = Number(height);
     this.color = color;
     this.sampleRange = [0, 0];
@@ -23,8 +26,19 @@ class SampledFieldPlane extends ScalarFieldView {
 
   setBounds(bounds) { this.bounds = { min: [...bounds.min], max: [...bounds.max] }; return this.invalidate(); }
   setResolution(value) { this.resolution = [...value]; return this.invalidate(); }
+  setSamplingPolicy(value) { this.samplingPolicy = value ?? new SpatialSamplingPolicy(); return this.invalidate(); }
   invalidate() { this.dirty = true; return this; }
   sample(x, y, z) { return this.sampleField([x, y, z]); }
+
+  effectiveResolution() {
+    const { min, max } = this.bounds;
+    this.samplingState = this.samplingPolicy.resolutionFor({
+      lengths: [max[0] - min[0], max[2] - min[2]],
+      baseResolution: this.resolution,
+      frequencyHz: viewSamplingFrequency(this),
+    });
+    return this.samplingState.resolution;
+  }
 
   recolor() {
     if (!this.samples.length) { this.range = this.valueRange ? [...this.valueRange] : [...this.sampleRange]; return this; }
@@ -36,7 +50,7 @@ class SampledFieldPlane extends ScalarFieldView {
   }
 
   rebuild() {
-    const [nx, nz] = this.resolution.map(Number);
+    const [nx, nz] = this.effectiveResolution().map(Number);
     if (!Number.isInteger(nx) || !Number.isInteger(nz) || nx < 2 || nz < 2) throw new Error('SampledFieldPlane resolution requires two integers >= 2');
     const { min, max } = this.bounds;
     const dx = (max[0] - min[0]) / nx;
