@@ -92,3 +92,47 @@ test('shared range stays stable when only slice topology changes', () => {
   assert.deepEqual(coordinator.range, initial);
   assert.deepEqual(heatmap.samples.map(sample => sample.color), heatmapColors);
 });
+
+test('shared range does not shrink when the same analysis is attenuated', () => {
+  let gain = 1;
+  const attenuatedField = { sample: (x, y, z) => gain * (x + z + 1) };
+  const heatmap = new SampledFieldPlane({ field: attenuatedField, id: '2d', frequency: 63, bounds: { min: [0, 0, 0], max: [2, 0, 2] }, resolution: [2, 2] });
+  const coordinator = new FieldViewRangeCoordinator({ views: [heatmap] });
+  coordinator.update();
+  const initial = [...coordinator.range];
+  gain = .25;
+  heatmap.invalidate();
+  coordinator.invalidate();
+  coordinator.update();
+  assert.deepEqual(coordinator.range, initial);
+  assert.ok(heatmap.sampleRange[1] < initial[1]);
+});
+
+test('changing analysis frequency establishes a new display range', () => {
+  let gain = 1;
+  const changingField = { sample: (x, y, z) => gain * (x + z + 1) };
+  const heatmap = new SampledFieldPlane({ field: changingField, id: '2d', frequency: 63, bounds: { min: [0, 0, 0], max: [2, 0, 2] }, resolution: [2, 2] });
+  const coordinator = new FieldViewRangeCoordinator({ views: [heatmap] });
+  coordinator.update();
+  const initial = [...coordinator.range];
+  gain = .25;
+  heatmap.setFrequency(80);
+  coordinator.invalidate();
+  coordinator.update();
+  assert.ok(coordinator.range[1] < initial[1]);
+  assert.deepEqual(coordinator.range, heatmap.sampleRange);
+});
+
+test('explicit reset allows same-analysis range to normalize again', () => {
+  let gain = 1;
+  const changingField = { sample: (x, y, z) => gain * (x + z + 1) };
+  const heatmap = new SampledFieldPlane({ field: changingField, id: '2d', frequency: 63, bounds: { min: [0, 0, 0], max: [2, 0, 2] }, resolution: [2, 2] });
+  const coordinator = new FieldViewRangeCoordinator({ views: [heatmap] });
+  coordinator.update();
+  const initial = [...coordinator.range];
+  gain = .25;
+  heatmap.invalidate();
+  coordinator.resetRange().update();
+  assert.ok(coordinator.range[1] < initial[1]);
+  assert.deepEqual(coordinator.range, heatmap.sampleRange);
+});
