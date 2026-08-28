@@ -13,7 +13,7 @@ test('SceneObject exposes reactive rotation state', () => {
   object.setRotation([.1, .2, .3]);
   assert.deepEqual(object.rotation, [.1, .2, .3]);
   assert.deepEqual(event.previous, [0, 0, 0]);
-  assert.deepEqual(event.rotation, [.1, .2, .3]);
+  assert.deepEqual(event.rotation, [.1, .2,.3]);
 });
 
 test('RenderStore box instances carry Euler rotation', () => {
@@ -62,4 +62,28 @@ test('disabling transform gizmos releases active pointer capture immediately', (
   assert.equal(controller.selected, null);
   assert.equal(captured, null);
   controller.destroy();
+});
+
+test('destroying transform gizmos releases active pointer capture', () => {
+  let captured = 11;
+  const listeners = new Map();
+  const canvas = {
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    removeEventListener(type) { listeners.delete(type); },
+    hasPointerCapture(id) { return captured === id; },
+    releasePointerCapture(id) { if (captured === id) captured = null; },
+  };
+  let layerRemoved = false;
+  const scene = { addLayer() { return () => { layerRemoved = true; }; } };
+  const controller = new TransformGizmoController(canvas, {}, scene, { enabled: true });
+  controller.pointer = { id: 11 };
+  controller.selected = { id: 'selected' };
+
+  controller.destroy();
+
+  assert.equal(captured, null);
+  assert.equal(controller.pointer, null);
+  assert.equal(controller.selected, null);
+  assert.equal(layerRemoved, true);
+  assert.equal(listeners.size, 0);
 });
