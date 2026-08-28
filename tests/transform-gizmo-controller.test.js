@@ -19,11 +19,11 @@ test('SceneObject exposes reactive rotation state', () => {
 test('RenderStore box instances carry Euler rotation', () => {
   const store = new RenderStore();
   store.begin(identity);
-  store.box([1,2,3], [4,5,6], [.1,.2,.3,.4], false, [.5,.6,.7]);
+  store.box([1,2,3], [4,5,6], [1,0,.5,.5], false, [.5,.25,.125]);
   const snapshot = store.snapshot();
   assert.equal(snapshot.counts.transparentBoxes, 1);
   assert.equal(snapshot.transparentBoxes.length, 13);
-  assert.deepEqual([...snapshot.transparentBoxes.slice(0, 13)], [1,2,3,4,5,6,.5,.6,.7,.1,.2,.3,.4]);
+  assert.deepEqual([...snapshot.transparentBoxes.slice(0, 13)], [1,2,3,4,5,6,.5,.25,.125,1,0,.5,.5]);
 });
 
 test('transform gizmo helpers prefer candidate adapters', () => {
