@@ -24,10 +24,17 @@ const BOX_VS = `#version 300 es
 layout(location=0) in vec3 p;
 layout(location=1) in vec3 instancePosition;
 layout(location=2) in vec3 instanceScale;
-layout(location=3) in vec4 instanceColor;
+layout(location=3) in vec3 instanceRotation;
+layout(location=4) in vec4 instanceColor;
 uniform mat4 vp;
 out vec4 color;
-void main(){ color=instanceColor; gl_Position=vp*vec4(instancePosition+p*instanceScale,1.0); }`;
+vec3 rotateEuler(vec3 v, vec3 r){
+  float cx=cos(r.x), sx=sin(r.x), cy=cos(r.y), sy=sin(r.y), cz=cos(r.z), sz=sin(r.z);
+  v=vec3(v.x, v.y*cx-v.z*sx, v.y*sx+v.z*cx);
+  v=vec3(v.x*cy+v.z*sy, v.y, -v.x*sy+v.z*cy);
+  return vec3(v.x*cz-v.y*sz, v.x*sz+v.y*cz, v.z);
+}
+void main(){ color=instanceColor; vec3 local=rotateEuler(p*instanceScale,instanceRotation); gl_Position=vp*vec4(instancePosition+local,1.0); }`;
 
 const BOX_FS = `#version 300 es
 precision highp float;
@@ -182,20 +189,24 @@ class WebGLBatchRenderer {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.boxInstanceBuffer);
-    const stride = 10 * 4;
-    for (let attr = 1; attr <= 2; attr++) {
-      gl.enableVertexAttribArray(attr);
-      gl.vertexAttribPointer(attr, 3, gl.FLOAT, false, stride, (attr - 1) * 3 * 4);
-      gl.vertexAttribDivisor(attr, 1);
-    }
-    gl.enableVertexAttribArray(3);
-    gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 6 * 4);
-    gl.vertexAttribDivisor(3, 1);
+    this.configureBoxAttributes(this.boxInstanceBuffer);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.boxFaceIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.boxFaces, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.boxEdgeIndexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.boxEdges, gl.STATIC_DRAW);
     gl.bindVertexArray(null);
+  }
+
+  configureBoxAttributes(instanceBuffer) {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
+    const stride = 13 * 4;
+    const spec = [[1,3,0],[2,3,3],[3,3,6],[4,4,9]];
+    for (const [attr, size, offset] of spec) {
+      gl.enableVertexAttribArray(attr);
+      gl.vertexAttribPointer(attr, size, gl.FLOAT, false, stride, offset * 4);
+      gl.vertexAttribDivisor(attr, 1);
+    }
   }
 
   initFlow() {
@@ -260,15 +271,11 @@ class WebGLBatchRenderer {
     this.stats.uploads = 0;
     this.stats.uploadBytes = 0;
   }
-  box(position, scale, color, outline = false) { this.store.box(position, scale, color, outline); }
+  box(position, scale, color, outline = false, source = null) { this.store.box(position, scale, color, outline, source?.rotation ?? [0, 0, 0]); }
   line(start, end, color) { this.store.line(start, end, color); }
   flow(start, end, scale, color, phase = 0, speed = 0) { this.store.flow(start, end, scale, color, phase, speed); }
-  text(text, center, width, height, color) {
-    this.queueText(text, center, width, height, color, false);
-  }
-  billboardText(text, center, width, height, color) {
-    this.queueText(text, center, width, height, color, true);
-  }
+  text(text, center, width, height, color) { this.queueText(text, center, width, height, color, false); }
+  billboardText(text, center, width, height, color) { this.queueText(text, center, width, height, color, true); }
   queueText(text, center, width, height, color, billboard) {
     const value = String(text ?? '');
     if (!value.length || width <= 0 || height <= 0) return;
@@ -296,6 +303,7 @@ class WebGLBatchRenderer {
     gl.uniformMatrix4fv(gl.getUniformLocation(this.boxProgram, 'vp'), false, new Float32Array(vp));
     gl.bindVertexArray(this.boxVao);
     this.upload(this.boxInstanceBuffer, data);
+    this.configureBoxAttributes(this.boxInstanceBuffer);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, outline ? this.boxEdgeIndexBuffer : this.boxFaceIndexBuffer);
     if (transparent) {
       gl.enable(gl.BLEND);
@@ -393,16 +401,7 @@ class WebGLBatchRenderer {
   bindBoxInstances(instanceBuffer) {
     const gl = this.gl;
     gl.bindVertexArray(this.boxVao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
-    const stride = 10 * 4;
-    for (let attr = 1; attr <= 2; attr++) {
-      gl.enableVertexAttribArray(attr);
-      gl.vertexAttribPointer(attr, 3, gl.FLOAT, false, stride, (attr - 1) * 3 * 4);
-      gl.vertexAttribDivisor(attr, 1);
-    }
-    gl.enableVertexAttribArray(3);
-    gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 6 * 4);
-    gl.vertexAttribDivisor(3, 1);
+    this.configureBoxAttributes(instanceBuffer);
   }
 
   commitPersistent() {
