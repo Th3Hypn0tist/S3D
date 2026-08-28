@@ -46,6 +46,8 @@ class WebGLImageRenderer extends WebGLBatchRenderer {
     this.imageBuffer = gl.createBuffer();
     this.imageQueue = [];
     this.imageCache = new Map();
+    this.protectedBoxQueue = [];
+    this.stats.protectedBoxes = 0;
     gl.bindVertexArray(this.imageVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.imageBuffer);
     gl.enableVertexAttribArray(0);
@@ -58,6 +60,22 @@ class WebGLImageRenderer extends WebGLBatchRenderer {
   begin(viewProjection) {
     super.begin(viewProjection);
     this.imageQueue.length = 0;
+    this.protectedBoxQueue.length = 0;
+    this.stats.protectedBoxes = 0;
+  }
+
+  box(position, scale, color, outline = false, source = null) {
+    if (!outline && source?.protectFromTransparency === true) {
+      this.protectedBoxQueue.push(
+        Number(position[0]), Number(position[1]), Number(position[2]),
+        Number(scale[0]), Number(scale[1]), Number(scale[2]),
+        Number(color[0]), Number(color[1]), Number(color[2]),
+        1,
+      );
+      this.stats.protectedBoxes += 1;
+      return;
+    }
+    super.box(position, scale, color, outline);
   }
 
   imagePlane(image, transform = {}) {
@@ -165,9 +183,26 @@ class WebGLImageRenderer extends WebGLBatchRenderer {
     gl.disable(gl.BLEND);
   }
 
+  drawProtectedBoxes(vp) {
+    const count = this.protectedBoxQueue.length / 10;
+    if (!count) return;
+    this.drawBoxes(new Float32Array(this.protectedBoxQueue), count, false, vp, false);
+  }
+
   flush(cameraRight, cameraUp, nowSeconds = performance.now() / 1000) {
-    this.drawImagePlanes(this.store.viewProjection);
-    return super.flush(cameraRight, cameraUp, nowSeconds);
+    const snapshot = this.store.snapshot();
+    const gl = this.gl;
+    this.drawImagePlanes(snapshot.viewProjection);
+    this.drawLines(snapshot.lines, snapshot.counts.lineVertices, snapshot.viewProjection);
+    this.drawBoxes(snapshot.solidBoxes, snapshot.counts.solidBoxes, false, snapshot.viewProjection);
+    this.drawBoxes(snapshot.transparentBoxes, snapshot.counts.transparentBoxes, false, snapshot.viewProjection, true);
+    this.drawProtectedBoxes(snapshot.viewProjection);
+    this.drawBoxes(snapshot.outlineBoxes, snapshot.counts.outlineBoxes, true, snapshot.viewProjection);
+    this.drawFlow(snapshot.flowPulses, snapshot.counts.flowPulses, snapshot.viewProjection, nowSeconds);
+    this.drawText(snapshot.glyphs, snapshot.counts.glyphs, snapshot.viewProjection, cameraRight, cameraUp);
+    gl.bindVertexArray(null);
+    Object.assign(this.stats, snapshot.counts);
+    return { ...this.stats };
   }
 }
 
