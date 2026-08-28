@@ -1,6 +1,6 @@
 {
   "name": "@th3hypn0tist/s3d",
-  "version": "0.6.6",
+  "version": "0.7.0",
   "type": "module",
   "exports": {
     ".": "./s3d.js",
