@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SceneObject } from '../core/objects/object.js';
 import { RenderStore } from '../core/render_store.js';
-import { TransformGizmoController, candidatePosition, candidateRotation, setCandidatePosition, setCandidateRotation } from '../core/interaction/transform-gizmo-controller.js';
+import { TransformGizmoController, candidatePosition, candidateRotation, positionHandleHit, setCandidatePosition, setCandidateRotation } from '../core/interaction/transform-gizmo-controller.js';
 
 const identity = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 
@@ -13,7 +13,7 @@ test('SceneObject exposes reactive rotation state', () => {
   object.setRotation([.1, .2, .3]);
   assert.deepEqual(object.rotation, [.1, .2, .3]);
   assert.deepEqual(event.previous, [0, 0, 0]);
-  assert.deepEqual(event.rotation, [.1, .2,.3]);
+  assert.deepEqual(event.rotation, [.1,.2,.3]);
 });
 
 test('RenderStore box instances carry Euler rotation', () => {
@@ -40,6 +40,46 @@ test('transform gizmo helpers prefer candidate adapters', () => {
   setCandidateRotation(candidate, [.2,.3,.4]);
   assert.deepEqual(candidate.position, [4,6,8]);
   assert.deepEqual(candidate.rotation, [.6,.9,1.2]);
+});
+
+test('position gizmo exposes pickable Y and Z handles', () => {
+  const center = [0, 0, 0];
+  const size = 1;
+  const yRay = { origin: [0, .75, -3], direction: [0, 0, 1] };
+  const zRay = { origin: [0, 3, .75], direction: [0, -1, 0] };
+  assert.equal(positionHandleHit(yRay, center, size)?.handle, 'y');
+  assert.equal(positionHandleHit(zRay, center, size)?.handle, 'z');
+});
+
+test('Y and Z handle drags constrain motion to the selected axis', () => {
+  const listeners = new Map();
+  const canvas = {
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    removeEventListener(type) { listeners.delete(type); },
+    getBoundingClientRect() { return { width: 800, height: 600 }; },
+    hasPointerCapture() { return false; },
+  };
+  const scene = { addLayer() { return () => {}; } };
+  const candidate = {
+    position: [1, 2, 3],
+    gizmoGetPosition() { return [...this.position]; },
+    gizmoSetPosition(value) { this.position = [...value]; return this; },
+  };
+  const camera = { ray(x, y) { return { origin: [x / 100, y / 100, -5], direction: [0, 0, 1] }; } };
+  const controller = new TransformGizmoController(canvas, camera, scene, { enabled: true });
+
+  controller.pointer = { candidate, handle: 'y', startPosition: [1, 2, 3], startAxisParameter: 2 };
+  camera.ray = () => ({ origin: [1, 5, -5], direction: [0, 0, 1] });
+  controller.positionPointerHandle({ clientX: 0, clientY: 0 });
+  assert.deepEqual(candidate.position, [1, 5, 3]);
+
+  candidate.position = [1, 2, 3];
+  controller.pointer = { candidate, handle: 'z', startPosition: [1, 2, 3], startAxisParameter: 3 };
+  camera.ray = () => ({ origin: [1, 2, -5], direction: [0, 0, 1] });
+  controller.positionPointerHandle({ clientX: 0, clientY: 0 });
+  assert.deepEqual(candidate.position, [1, 2, 3]);
+
+  controller.destroy();
 });
 
 test('disabling transform gizmos releases active pointer capture immediately', () => {
