@@ -65,17 +65,19 @@ class WebGLImageRenderer extends WebGLBatchRenderer {
   }
 
   box(position, scale, color, outline = false, source = null) {
+    const rotation = source?.rotation ?? [0, 0, 0];
     if (!outline && source?.protectFromTransparency === true) {
       this.protectedBoxQueue.push(
         Number(position[0]), Number(position[1]), Number(position[2]),
         Number(scale[0]), Number(scale[1]), Number(scale[2]),
+        Number(rotation[0] ?? 0), Number(rotation[1] ?? 0), Number(rotation[2] ?? 0),
         Number(color[0]), Number(color[1]), Number(color[2]),
         1,
       );
       this.stats.protectedBoxes += 1;
       return;
     }
-    super.box(position, scale, color, outline);
+    super.box(position, scale, color, outline, source);
   }
 
   imagePlane(image, transform = {}) {
@@ -184,7 +186,7 @@ class WebGLImageRenderer extends WebGLBatchRenderer {
   }
 
   drawProtectedBoxes(vp) {
-    const count = this.protectedBoxQueue.length / 10;
+    const count = this.protectedBoxQueue.length / 13;
     if (!count) return;
     this.drawBoxes(new Float32Array(this.protectedBoxQueue), count, false, vp, false);
   }
