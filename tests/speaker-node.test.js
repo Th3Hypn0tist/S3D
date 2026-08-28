@@ -24,3 +24,20 @@ test('SpeakerNode normalizes direction vectors', () => {
   node.setDirection([0, 3, 0]);
   assert.deepEqual(node.direction, [0, 1, 0]);
 });
+
+test('SpeakerNode direction orientation override is independent of model world orientation', () => {
+  const quarterTurnY = [0, Math.sin(Math.PI / 4), 0, Math.cos(Math.PI / 4)];
+  const node = new SpeakerNode({ id: 'speaker' });
+  node.model = { orientation: quarterTurnY };
+  const worldDirection = node.effectiveDirection();
+  assert.ok(Math.abs(worldDirection[0] - 1) < 1e-9);
+  assert.ok(Math.abs(worldDirection[2]) < 1e-9);
+
+  node.setDirectionOrientation([0, 0, 0, 1]);
+  assert.deepEqual(node.effectiveDirection(), [0, 0, 1]);
+
+  node.setDirectionOrientation(null);
+  const restored = node.effectiveDirection();
+  assert.ok(Math.abs(restored[0] - 1) < 1e-9);
+  assert.ok(Math.abs(restored[2]) < 1e-9);
+});
