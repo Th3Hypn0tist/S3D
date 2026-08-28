@@ -136,3 +136,22 @@ test('explicit reset allows same-analysis range to normalize again', () => {
   assert.ok(coordinator.range[1] < initial[1]);
   assert.deepEqual(coordinator.range, heatmap.sampleRange);
 });
+
+test('field analysis signature changes establish a new range without explicit coordinator invalidation', () => {
+  let component = 'hybrid';
+  let gain = 1;
+  const changingField = {
+    sample: (x, y, z) => gain * (x + z + 1),
+    analysisSignature: () => `component:${component}`,
+  };
+  const heatmap = new SampledFieldPlane({ field: changingField, id: '2d', frequency: 63, bounds: { min: [0, 0, 0], max: [2, 0, 2] }, resolution: [2, 2] });
+  const coordinator = new FieldViewRangeCoordinator({ views: [heatmap] });
+  coordinator.update();
+  const initial = [...coordinator.range];
+  component = 'modal';
+  gain = .25;
+  heatmap.invalidate();
+  coordinator.update();
+  assert.ok(coordinator.range[1] < initial[1]);
+  assert.deepEqual(coordinator.range, heatmap.sampleRange);
+});
