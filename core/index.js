@@ -8,9 +8,10 @@ import { FloatStore, RenderStore } from './render_store.js';
 import { GlyphAtlas, WebGLBatchRenderer } from './webgl_batch_renderer.js';
 import { WebGLImageRenderer } from './webgl_image_renderer.js';
 import { PerspectiveCamera } from './camera.js';
-import { Viewport } from './viewport.js';
+import { Viewport, viewportForCanvas } from './viewport.js';
 import { OrbitControls } from './interaction/orbit-controls.js';
 import { PlaneDragController } from './interaction/plane-drag-controller.js';
+import { TransformGizmoController } from './interaction/transform-gizmo-controller.js';
 import { SceneObject, Group } from './objects/object.js';
 import { Primitive, Box, Point, Cylinder } from './objects/primitives.js';
 import { Anchor } from './objects/anchors.js';
@@ -43,8 +44,10 @@ const S3D = Object.freeze({
   WebGLImageRenderer,
   PerspectiveCamera,
   Viewport,
+  viewportForCanvas,
   OrbitControls,
   PlaneDragController,
+  TransformGizmoController,
   SceneObject,
   Group,
   Primitive,
@@ -83,8 +86,10 @@ export {
   WebGLImageRenderer,
   PerspectiveCamera,
   Viewport,
+  viewportForCanvas,
   OrbitControls,
   PlaneDragController,
+  TransformGizmoController,
   SceneObject,
   Group,
   Primitive,
