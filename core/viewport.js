@@ -1,5 +1,7 @@
 import { WebGLImageRenderer } from './webgl_image_renderer.js';
 
+const viewportsByCanvas = new WeakMap();
+
 class Viewport {
   constructor(canvas, { camera, clearColor = [.025, .03, .045, 1], pixelRatio = () => globalThis.devicePixelRatio || 1 } = {}) {
     if (!canvas || typeof canvas.getContext !== 'function') throw new Error('Viewport requires a canvas');
@@ -15,6 +17,7 @@ class Viewport {
     this.running = false;
     this.frameHandle = null;
     this.previousNow = 0;
+    viewportsByCanvas.set(canvas, this);
   }
 
   resize() {
@@ -68,7 +71,9 @@ class Viewport {
     this.frameHandle = null;
   }
 
-  destroy() { this.stop(); this.scene = null; }
+  destroy() { this.stop(); this.scene = null; viewportsByCanvas.delete(this.canvas); }
 }
 
-export { Viewport };
+function viewportForCanvas(canvas) { return viewportsByCanvas.get(canvas) ?? null; }
+
+export { Viewport, viewportForCanvas };
