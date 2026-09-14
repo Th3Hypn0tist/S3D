@@ -1,8 +1,9 @@
 import { SceneObject } from '../../core/objects/object.js';
-import { BOX_INSTANCE_STRIDE } from '../../core/render_store.js';
+import { BOX_INSTANCE_STRIDE, writeBoxInstance } from '../../core/render_store.js';
 import { finiteNumber } from './dimension.js';
 import { MetricSpace, finiteVec3, projectionBounds } from './metric-space.js';
 import { Observation } from './observation.js';
+import { VisualEncoding } from './visual-encoding.js';
 
 function positiveVec3(value, label) {
   const result = finiteVec3(value, label);
@@ -25,22 +26,6 @@ function sameVec3(a, b) {
   return a.length === 3 && b.length === 3 && a.every((value, index) => value === b[index]);
 }
 
-function writeInstance(buffer, offset, position, scale, color) {
-  buffer[offset] = position[0];
-  buffer[offset + 1] = position[1];
-  buffer[offset + 2] = position[2];
-  buffer[offset + 3] = scale[0];
-  buffer[offset + 4] = scale[1];
-  buffer[offset + 5] = scale[2];
-  buffer[offset + 6] = 0;
-  buffer[offset + 7] = 0;
-  buffer[offset + 8] = 0;
-  buffer[offset + 9] = color[0];
-  buffer[offset + 10] = color[1];
-  buffer[offset + 11] = color[2];
-  buffer[offset + 12] = color[3] ?? 1;
-}
-
 class MetricPointCloud extends SceneObject {
   constructor({
     id,
@@ -49,6 +34,7 @@ class MetricPointCloud extends SceneObject {
     bounds = { min: [-1, -1, -1], max: [1, 1, 1] },
     pointScale = [0.04, 0.04, 0.04],
     color = [0.35, 0.7, 1],
+    visualEncoding = null,
     selectedColor = [1, 0.75, 0.2],
     selectedScaleMultiplier = 1.35,
     axisColor = [0.4, 0.4, 0.4],
@@ -58,10 +44,14 @@ class MetricPointCloud extends SceneObject {
   } = {}) {
     super({ id, metadata, selectable: false });
     if (!(space instanceof MetricSpace)) throw new Error('MetricPointCloud requires a MetricSpace');
+    if (visualEncoding !== null && !(visualEncoding instanceof VisualEncoding)) {
+      throw new Error('MetricPointCloud visualEncoding must be a VisualEncoding or null');
+    }
     this.space = space;
     this.bounds = projectionBounds(bounds);
     this.pointScale = positiveVec3(pointScale, 'MetricPointCloud pointScale');
     this.color = colorValue(color, 'MetricPointCloud color');
+    this.visualEncoding = visualEncoding;
     this.selectedColor = colorValue(selectedColor, 'MetricPointCloud selectedColor');
     this.selectedScaleMultiplier = finiteNumber(selectedScaleMultiplier, 'MetricPointCloud selectedScaleMultiplier');
     if (this.selectedScaleMultiplier <= 1) throw new Error('MetricPointCloud selectedScaleMultiplier must be > 1');
@@ -99,6 +89,15 @@ class MetricPointCloud extends SceneObject {
 
   setBounds(bounds) {
     this.bounds = projectionBounds(bounds);
+    this._markProjectionDirty();
+    return this;
+  }
+
+  setVisualEncoding(visualEncoding) {
+    if (visualEncoding !== null && !(visualEncoding instanceof VisualEncoding)) {
+      throw new Error('MetricPointCloud visualEncoding must be a VisualEncoding or null');
+    }
+    this.visualEncoding = visualEncoding;
     this._markProjectionDirty();
     return this;
   }
@@ -147,14 +146,31 @@ class MetricPointCloud extends SceneObject {
 
     for (let index = 0; index < count; index += 1) {
       const observation = this.observations[index];
-      const x = origin[0] + min[0] + (max[0] - min[0]) * xDimension.normalize(observation.value(xDimension.id));
-      const y = origin[1] + min[1] + (max[1] - min[1]) * yDimension.normalize(observation.value(yDimension.id));
-      const z = origin[2] + min[2] + (max[2] - min[2]) * zDimension.normalize(observation.value(zDimension.id));
+      const defaultPosition = [
+        origin[0] + min[0] + (max[0] - min[0]) * xDimension.normalize(observation.value(xDimension.id)),
+        origin[1] + min[1] + (max[1] - min[1]) * yDimension.normalize(observation.value(yDimension.id)),
+        origin[2] + min[2] + (max[2] - min[2]) * zDimension.normalize(observation.value(zDimension.id)),
+      ];
+      const encoded = this.visualEncoding
+        ? this.visualEncoding.encode(observation, this.space, {
+          position: defaultPosition,
+          rotation: [0, 0, 0],
+          scale: this.pointScale,
+          color: this.color,
+        })
+        : { position: defaultPosition, rotation: [0, 0, 0], scale: this.pointScale, color: this.color };
       const positionOffset = index * 3;
-      positions[positionOffset] = x;
-      positions[positionOffset + 1] = y;
-      positions[positionOffset + 2] = z;
-      writeInstance(instances, index * BOX_INSTANCE_STRIDE, [x, y, z], this.pointScale, this.color);
+      positions[positionOffset] = encoded.position[0];
+      positions[positionOffset + 1] = encoded.position[1];
+      positions[positionOffset + 2] = encoded.position[2];
+      writeBoxInstance(
+        instances,
+        index * BOX_INSTANCE_STRIDE,
+        encoded.position,
+        encoded.scale,
+        encoded.rotation,
+        encoded.color,
+      );
     }
 
     this._positions = positions;
@@ -171,17 +187,32 @@ class MetricPointCloud extends SceneObject {
 
   _rebuildSelectionInstances() {
     this._ensureProjection();
-    const scale = this.pointScale.map(component => component * this.selectedScaleMultiplier);
     const instances = new Float32Array(this.selectedIds.size * BOX_INSTANCE_STRIDE);
     let targetIndex = 0;
     for (const id of this.selectedIds) {
       const sourceIndex = this._indexById.get(id);
-      const positionOffset = sourceIndex * 3;
-      writeInstance(
+      const sourceOffset = sourceIndex * BOX_INSTANCE_STRIDE;
+      const position = [
+        this._instances[sourceOffset],
+        this._instances[sourceOffset + 1],
+        this._instances[sourceOffset + 2],
+      ];
+      const scale = [
+        this._instances[sourceOffset + 3] * this.selectedScaleMultiplier,
+        this._instances[sourceOffset + 4] * this.selectedScaleMultiplier,
+        this._instances[sourceOffset + 5] * this.selectedScaleMultiplier,
+      ];
+      const rotation = [
+        this._instances[sourceOffset + 6],
+        this._instances[sourceOffset + 7],
+        this._instances[sourceOffset + 8],
+      ];
+      writeBoxInstance(
         instances,
         targetIndex * BOX_INSTANCE_STRIDE,
-        [this._positions[positionOffset], this._positions[positionOffset + 1], this._positions[positionOffset + 2]],
+        position,
         scale,
+        rotation,
         this.selectedColor,
       );
       targetIndex += 1;
@@ -265,12 +296,12 @@ class MetricPointCloud extends SceneObject {
         const offset = index * 3;
         const observation = this.observations[index];
         const position = [this._positions[offset], this._positions[offset + 1], this._positions[offset + 2]];
-        const labelPosition = [position[0], position[1] + this.pointScale[1] * this.selectedScaleMultiplier * 2.5, position[2]];
         const width = Math.max(0.2, observation.label.length * 0.08);
+        const labelPosition = [position[0], position[1] + width * 0.25, position[2]];
         renderer.billboardText(observation.label, labelPosition, width, 0.12, this.selectedColor, this, context);
       }
     }
   }
 }
 
-export { MetricPointCloud, colorValue, instanceKind, positiveVec3, writeInstance };
+export { MetricPointCloud, colorValue, instanceKind, positiveVec3 };
