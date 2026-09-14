@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { PerspectiveCamera } from '../core/index.js';
-import { RenderStore } from '../core/render_store.js';
+import { BOX_INSTANCE_STRIDE, RenderStore } from '../core/render_store.js';
 import { distanceFromRay, intersectPlane } from '../core/interaction/plane-drag-controller.js';
 import { FrequencyRangeController, OrthogonalFieldSlices, SpeakerNode, SampledFieldPlane } from '../domains/acoustics/index.js';
 
@@ -106,6 +106,6 @@ test('render store routes alpha boxes into a transparent RGBA batch', () => {
   const snapshot = store.snapshot();
   assert.equal(snapshot.counts.transparentBoxes, 1);
   assert.equal(snapshot.counts.solidBoxes, 1);
-  assert.equal(snapshot.transparentBoxes.length, 10);
-  assert.ok(Math.abs(snapshot.transparentBoxes[9] - .25) < 1e-6);
+  assert.equal(snapshot.transparentBoxes.length, BOX_INSTANCE_STRIDE);
+  assert.ok(Math.abs(snapshot.transparentBoxes[BOX_INSTANCE_STRIDE - 1] - .25) < 1e-6);
 });
