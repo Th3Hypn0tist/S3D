@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { RenderStore } from '../core/render_store.js';
+import { BOX_INSTANCE_STRIDE, RenderStore } from '../core/render_store.js';
 import {
   Dimension,
   Distribution,
@@ -120,12 +120,11 @@ test('RenderStore accepts packed box instances as one bulk append', () => {
   const store = new RenderStore();
   store.begin(new Float32Array(16));
   const count = 4096;
-  const instances = new Float32Array(count * 13);
-  for (let index = 0; index < count; index += 1) instances[index * 13 + 12] = 1;
+  const instances = new Float32Array(count * BOX_INSTANCE_STRIDE);
   store.boxInstances(instances, 'solid');
   const snapshot = store.snapshot();
   assert.equal(snapshot.counts.solidBoxes, count);
-  assert.equal(snapshot.solidBoxes.length, count * 13);
+  assert.equal(snapshot.solidBoxes.length, count * BOX_INSTANCE_STRIDE);
 });
 
 test('MetricPointCloud submits cached packed instance buffers instead of one draw call per observation', () => {
@@ -146,7 +145,7 @@ test('MetricPointCloud submits cached packed instance buffers instead of one dra
   cloud.draw(renderer);
   cloud.draw(renderer);
   assert.equal(calls.length, 2);
-  assert.equal(calls[0].instances.length, observations.length * 13);
+  assert.equal(calls[0].instances.length, observations.length * BOX_INSTANCE_STRIDE);
   assert.strictEqual(calls[0].instances, calls[1].instances);
   assert.equal(calls[0].kind, 'solid');
 });
@@ -177,11 +176,11 @@ test('MetricPointCloud writes visual encodings directly into packed instances', 
   const calls = [];
   cloud.draw({ boxInstances(instances, kind) { calls.push({ instances, kind }); } });
   assert.equal(calls.length, 1);
-  const b = 13;
+  const b = BOX_INSTANCE_STRIDE;
   approximately(calls[0].instances[b + 6], 0.6, 1e-6);
   approximately(calls[0].instances[b + 4], 1.1, 1e-6);
   approximately(calls[0].instances[b + 10], 0.5, 1e-6);
-  assert.equal(calls[0].instances.length, observations.length * 13);
+  assert.equal(calls[0].instances.length, observations.length * BOX_INSTANCE_STRIDE);
 });
 
 test('MetricPointCloud renders selection as a second small instanced overlay', () => {
