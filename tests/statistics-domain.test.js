@@ -9,6 +9,7 @@ import {
   MetricSpace,
   Observation,
   RangeSelection,
+  VisualEncoding,
 } from '../domains/statistics/index.js';
 
 const observations = [
@@ -82,6 +83,39 @@ test('RangeSelection filters observations without interpreting metadata', () => 
   assert.deepEqual(selection.filter(observations).map(item => item.id), ['b', 'c']);
 });
 
+test('VisualEncoding maps numeric dimensions into independent visual channels', () => {
+  const space = new MetricSpace({
+    dimensions: [
+      new Dimension({ id: 'quality', domain: [0, 100] }),
+      new Dimension({ id: 'speed', domain: [0, 50] }),
+      new Dimension({ id: 'latency', domain: [0, 200] }),
+    ],
+    axes: { x: 'quality', y: 'speed', z: 'latency' },
+  });
+  const encoding = new VisualEncoding({
+    bindings: {
+      'position.x': { dimension: 'quality', range: [-10, 10] },
+      'rotation.y': { dimension: 'latency', range: [0, Math.PI] },
+      'scale.z': { dimension: 'speed', range: [0.1, 2.1] },
+      'color.r': { dimension: 'quality', range: [0, 1] },
+      'color.b': { dimension: 'latency', range: [1, 0] },
+    },
+  });
+  const encoded = encoding.encode(observations[1], space, {
+    position: [0, 2, 3],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+    color: [0.2, 0.4, 0.6, 1],
+  });
+  assert.deepEqual(encoded.position, [2, 2, 3]);
+  approximately(encoded.rotation[1], Math.PI / 2);
+  approximately(encoded.scale[2], 1.3);
+  approximately(encoded.color[0], 0.6);
+  assert.equal(encoded.color[1], 0.4);
+  approximately(encoded.color[2], 0.5);
+  assert.equal(encoded.color[3], 1);
+});
+
 test('RenderStore accepts packed box instances as one bulk append', () => {
   const store = new RenderStore();
   store.begin(new Float32Array(16));
@@ -115,6 +149,39 @@ test('MetricPointCloud submits cached packed instance buffers instead of one dra
   assert.equal(calls[0].instances.length, observations.length * 13);
   assert.strictEqual(calls[0].instances, calls[1].instances);
   assert.equal(calls[0].kind, 'solid');
+});
+
+test('MetricPointCloud writes visual encodings directly into packed instances', () => {
+  const space = new MetricSpace({
+    dimensions: [
+      new Dimension({ id: 'quality', domain: [0, 100] }),
+      new Dimension({ id: 'speed', domain: [0, 50] }),
+      new Dimension({ id: 'latency', domain: [0, 200] }),
+    ],
+    axes: { x: 'quality', y: 'speed', z: 'latency' },
+  });
+  const visualEncoding = new VisualEncoding({
+    bindings: {
+      'rotation.x': { dimension: 'quality', range: [0, 1] },
+      'scale.y': { dimension: 'speed', range: [0.5, 1.5] },
+      'color.g': { dimension: 'latency', range: [0, 1] },
+    },
+  });
+  const cloud = new MetricPointCloud({
+    id: 'encoded-cloud',
+    space,
+    observations,
+    visualEncoding,
+    showAxes: false,
+  });
+  const calls = [];
+  cloud.draw({ boxInstances(instances, kind) { calls.push({ instances, kind }); } });
+  assert.equal(calls.length, 1);
+  const b = 13;
+  approximately(calls[0].instances[b + 6], 0.6, 1e-6);
+  approximately(calls[0].instances[b + 4], 1.1, 1e-6);
+  approximately(calls[0].instances[b + 10], 0.5, 1e-6);
+  assert.equal(calls[0].instances.length, observations.length * 13);
 });
 
 test('MetricPointCloud renders selection as a second small instanced overlay', () => {
