@@ -1,7 +1,8 @@
 // WebGL2-first batched renderer for S3D RenderStore.
 // Boxes use shared cube geometry + instancing, links use one packed line draw,
 // link flow is shader-driven, and text uses a shared glyph atlas + instanced quads.
-import { RenderStore } from './render_store.js';
+import { BOX_EDGE_INDICES, BOX_FACE_INDICES, BOX_VERTICES } from './box_geometry.js';
+import { BOX_INSTANCE_STRIDE, RenderStore } from './render_store.js';
 
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
@@ -180,9 +181,9 @@ class WebGLBatchRenderer {
     this.boxInstanceBuffer = gl.createBuffer();
     this.boxFaceIndexBuffer = gl.createBuffer();
     this.boxEdgeIndexBuffer = gl.createBuffer();
-    this.boxVertices = new Float32Array([-1,-1,-1, 1,-1,-1, 1,1,-1, -1,1,-1, -1,-1,1, 1,-1,1, 1,1,1, -1,1,1]);
-    this.boxFaces = new Uint16Array([0,2,1,0,3,2,4,5,6,4,6,7,0,4,7,0,7,3,1,2,6,1,6,5,0,1,5,0,5,4,3,7,6,3,6,2]);
-    this.boxEdges = new Uint16Array([0,1,1,2,2,3,3,0,4,5,5,6,6,7,7,4,0,4,1,5,2,6,3,7]);
+    this.boxVertices = new Float32Array(BOX_VERTICES);
+    this.boxFaces = new Uint16Array(BOX_FACE_INDICES);
+    this.boxEdges = new Uint16Array(BOX_EDGE_INDICES);
     gl.bindVertexArray(this.boxVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.boxVertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.boxVertices, gl.STATIC_DRAW);
@@ -200,7 +201,7 @@ class WebGLBatchRenderer {
   configureBoxAttributes(instanceBuffer) {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
-    const stride = 13 * 4;
+    const stride = BOX_INSTANCE_STRIDE * 4;
     const spec = [[1,3,0],[2,3,3],[3,3,6],[4,4,9]];
     for (const [attr, size, offset] of spec) {
       gl.enableVertexAttribArray(attr);
