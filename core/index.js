@@ -4,7 +4,18 @@
 import { S3D_VERSION, Scene, Selection, Playback, normalizePlaybackBoundaries } from './core.js';
 import { Vec3, Mat4 } from './math.js';
 import { Renderer } from './renderer.js';
-import { FloatStore, RenderStore } from './render_store.js';
+import {
+  BOX_FACE_COLOR_OFFSET,
+  BOX_FACE_COLOR_STRIDE,
+  BOX_INSTANCE_KINDS,
+  BOX_INSTANCE_STRIDE,
+  BOX_INSTANCE_TRANSFORM_STRIDE,
+  FloatStore,
+  RenderStore,
+  boxInstanceHasTransparency,
+  writeBoxFaceInstance,
+  writeBoxInstance,
+} from './render_store.js';
 import { BOX_VERTICES, BOX_FACES, BOX_FACE_ORDER, BOX_FACE_INDICES, BOX_EDGE_INDICES, boxFaceIndex } from './box_geometry.js';
 import { GlyphAtlas, WebGLBatchRenderer } from './webgl_batch_renderer.js';
 import { WebGLImageRenderer } from './webgl_image_renderer.js';
@@ -40,6 +51,14 @@ const S3D = Object.freeze({
   Renderer,
   FloatStore,
   RenderStore,
+  BOX_INSTANCE_KINDS,
+  BOX_INSTANCE_STRIDE,
+  BOX_INSTANCE_TRANSFORM_STRIDE,
+  BOX_FACE_COLOR_OFFSET,
+  BOX_FACE_COLOR_STRIDE,
+  writeBoxInstance,
+  writeBoxFaceInstance,
+  boxInstanceHasTransparency,
   BOX_VERTICES,
   BOX_FACES,
   BOX_FACE_ORDER,
@@ -88,6 +107,14 @@ export {
   Renderer,
   FloatStore,
   RenderStore,
+  BOX_INSTANCE_KINDS,
+  BOX_INSTANCE_STRIDE,
+  BOX_INSTANCE_TRANSFORM_STRIDE,
+  BOX_FACE_COLOR_OFFSET,
+  BOX_FACE_COLOR_STRIDE,
+  writeBoxInstance,
+  writeBoxFaceInstance,
+  boxInstanceHasTransparency,
   BOX_VERTICES,
   BOX_FACES,
   BOX_FACE_ORDER,
