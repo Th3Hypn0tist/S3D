@@ -1,14 +1,30 @@
 // Reusable high-density render store.
 // Pure data batching only: no globals, host semantics or renderer mutation.
 
-const BOX_INSTANCE_STRIDE = 13;
+import { BOX_FACE_ORDER } from './box_geometry.js';
+
+const BOX_INSTANCE_TRANSFORM_STRIDE = 9;
+const BOX_FACE_COLOR_STRIDE = 4;
+const BOX_FACE_COLOR_OFFSET = BOX_INSTANCE_TRANSFORM_STRIDE;
+const BOX_INSTANCE_STRIDE = BOX_INSTANCE_TRANSFORM_STRIDE + BOX_FACE_ORDER.length * BOX_FACE_COLOR_STRIDE;
 const BOX_INSTANCE_KINDS = Object.freeze(['solid', 'transparent', 'outline']);
 
-function writeBoxInstance(buffer, offset, position, scale, rotation, color) {
-  if (!(buffer instanceof Float32Array)) throw new Error('writeBoxInstance requires Float32Array');
+function writeColor(buffer, offset, color) {
+  buffer[offset] = Number(color[0]);
+  buffer[offset + 1] = Number(color[1]);
+  buffer[offset + 2] = Number(color[2]);
+  const rawAlpha = Number(color[3] ?? 1);
+  buffer[offset + 3] = Number.isFinite(rawAlpha) ? Math.max(0, Math.min(1, rawAlpha)) : 1;
+}
+
+function validateTarget(buffer, offset, label) {
+  if (!(buffer instanceof Float32Array)) throw new Error(`${label} requires Float32Array`);
   if (!Number.isInteger(offset) || offset < 0 || offset + BOX_INSTANCE_STRIDE > buffer.length) {
-    throw new Error('writeBoxInstance offset is outside the target buffer');
+    throw new Error(`${label} offset is outside the target buffer`);
   }
+}
+
+function writeTransform(buffer, offset, position, scale, rotation) {
   buffer[offset] = Number(position[0]);
   buffer[offset + 1] = Number(position[1]);
   buffer[offset + 2] = Number(position[2]);
@@ -18,11 +34,39 @@ function writeBoxInstance(buffer, offset, position, scale, rotation, color) {
   buffer[offset + 6] = Number(rotation[0] ?? 0);
   buffer[offset + 7] = Number(rotation[1] ?? 0);
   buffer[offset + 8] = Number(rotation[2] ?? 0);
-  buffer[offset + 9] = Number(color[0]);
-  buffer[offset + 10] = Number(color[1]);
-  buffer[offset + 11] = Number(color[2]);
-  const rawAlpha = Number(color[3] ?? 1);
-  buffer[offset + 12] = Number.isFinite(rawAlpha) ? Math.max(0, Math.min(1, rawAlpha)) : 1;
+}
+
+function writeBoxFaceInstance(buffer, offset, position, scale, rotation, faceColors) {
+  validateTarget(buffer, offset, 'writeBoxFaceInstance');
+  if (!Array.isArray(faceColors) || faceColors.length !== BOX_FACE_ORDER.length) {
+    throw new Error(`writeBoxFaceInstance requires ${BOX_FACE_ORDER.length} face colors in canonical order`);
+  }
+  writeTransform(buffer, offset, position, scale, rotation);
+  for (let faceIndex = 0; faceIndex < BOX_FACE_ORDER.length; faceIndex += 1) {
+    const color = faceColors[faceIndex];
+    if (!Array.isArray(color) || ![3, 4].includes(color.length)) {
+      throw new Error(`writeBoxFaceInstance face ${BOX_FACE_ORDER[faceIndex]} must be RGB or RGBA`);
+    }
+    writeColor(buffer, offset + BOX_FACE_COLOR_OFFSET + faceIndex * BOX_FACE_COLOR_STRIDE, color);
+  }
+}
+
+function writeBoxInstance(buffer, offset, position, scale, rotation, color) {
+  validateTarget(buffer, offset, 'writeBoxInstance');
+  if (!Array.isArray(color) || ![3, 4].includes(color.length)) throw new Error('writeBoxInstance color must be RGB or RGBA');
+  writeTransform(buffer, offset, position, scale, rotation);
+  for (let faceIndex = 0; faceIndex < BOX_FACE_ORDER.length; faceIndex += 1) {
+    writeColor(buffer, offset + BOX_FACE_COLOR_OFFSET + faceIndex * BOX_FACE_COLOR_STRIDE, color);
+  }
+}
+
+function boxInstanceHasTransparency(buffer, offset = 0) {
+  validateTarget(buffer, offset, 'boxInstanceHasTransparency');
+  for (let faceIndex = 0; faceIndex < BOX_FACE_ORDER.length; faceIndex += 1) {
+    const alphaOffset = offset + BOX_FACE_COLOR_OFFSET + faceIndex * BOX_FACE_COLOR_STRIDE + 3;
+    if (buffer[alphaOffset] < 1) return true;
+  }
+  return false;
 }
 
 class FloatStore {
@@ -76,17 +120,25 @@ class RenderStore {
     this.flowPulses.clear();
     for (const key of Object.keys(this.counts)) this.counts[key] = 0;
   }
-  box(position, scale, color, outline = false, rotation = [0, 0, 0]) {
-    if (!this.viewProjection) throw new Error('RenderStore.box requires begin()');
-    const instance = new Float32Array(BOX_INSTANCE_STRIDE);
-    writeBoxInstance(instance, 0, position, scale, rotation, color);
-    const alpha = instance[12];
-    const transparent = !outline && alpha < 1;
+  _appendBoxInstance(instance, outline) {
+    const transparent = !outline && boxInstanceHasTransparency(instance);
     const target = outline ? this.outlineBoxes : transparent ? this.transparentBoxes : this.solidBoxes;
     target.append(instance);
     if (outline) this.counts.outlineBoxes += 1;
     else if (transparent) this.counts.transparentBoxes += 1;
     else this.counts.solidBoxes += 1;
+  }
+  box(position, scale, color, outline = false, rotation = [0, 0, 0]) {
+    if (!this.viewProjection) throw new Error('RenderStore.box requires begin()');
+    const instance = new Float32Array(BOX_INSTANCE_STRIDE);
+    writeBoxInstance(instance, 0, position, scale, rotation, color);
+    this._appendBoxInstance(instance, outline);
+  }
+  boxFaces(position, scale, faceColors, outline = false, rotation = [0, 0, 0]) {
+    if (!this.viewProjection) throw new Error('RenderStore.boxFaces requires begin()');
+    const instance = new Float32Array(BOX_INSTANCE_STRIDE);
+    writeBoxFaceInstance(instance, 0, position, scale, rotation, faceColors);
+    this._appendBoxInstance(instance, outline);
   }
   boxInstances(instances, kind) {
     if (!this.viewProjection) throw new Error('RenderStore.boxInstances requires begin()');
@@ -150,4 +202,15 @@ class RenderStore {
   }
 }
 
-export { BOX_INSTANCE_KINDS, BOX_INSTANCE_STRIDE, FloatStore, RenderStore, writeBoxInstance };
+export {
+  BOX_FACE_COLOR_OFFSET,
+  BOX_FACE_COLOR_STRIDE,
+  BOX_INSTANCE_KINDS,
+  BOX_INSTANCE_STRIDE,
+  BOX_INSTANCE_TRANSFORM_STRIDE,
+  FloatStore,
+  RenderStore,
+  boxInstanceHasTransparency,
+  writeBoxFaceInstance,
+  writeBoxInstance,
+};
