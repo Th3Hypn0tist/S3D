@@ -43,6 +43,7 @@ S3D core currently provides:
 - reusable packed render store
 - solid, transparent and outline box batching
 - packed box-instance submission
+- canonical per-face RGBA box channels
 - lines
 - glyphs
 - flow pulses
@@ -54,19 +55,35 @@ S3D core currently provides:
 
 ### Packed box instance layout
 
-Dense box rendering uses one shared 13-float instance layout:
+Dense box rendering uses one shared 33-float instance layout:
 
 ```text
-position XYZ   3
-scale XYZ      3
-rotation XYZ   3
-RGB            3
-alpha          1
-----------------
-total         13 floats / instance
+position XYZ                    3
+scale XYZ                       3
+rotation XYZ                    3
+face z- RGBA                    4
+face z+ RGBA                    4
+face x- RGBA                    4
+face x+ RGBA                    4
+face y- RGBA                    4
+face y+ RGBA                    4
+---------------------------------
+total                          33 floats / instance
 ```
 
-The layout and writer live in core through `BOX_INSTANCE_STRIDE` and `writeBoxInstance()`. Domains consume the core layout instead of reproducing GPU-instance formats independently.
+The canonical face order is:
+
+```text
+z-, z+, x-, x+, y-, y+
+```
+
+The geometry contract lives in core through `BOX_FACES`, `BOX_FACE_ORDER`, `BOX_FACE_INDICES` and `boxFaceIndex()`. The packed instance contract lives in core through `BOX_INSTANCE_STRIDE`, `BOX_FACE_COLOR_OFFSET`, `BOX_FACE_COLOR_STRIDE`, `writeBoxInstance()` and `writeBoxFaceInstance()`.
+
+`writeBoxInstance()` is a uniform-material shorthand: one RGB/RGBA value is copied into all six canonical face slots. It does not create a second base-color truth. `writeBoxFaceInstance()` requires all six face colors explicitly and in canonical order. Partial face sets are rejected.
+
+A box is routed to the transparent batch when any face has alpha below 1. The WebGL renderer keeps the representation instanced: the six face colors are instance attributes, so per-face color does not require six draw calls or duplicated box geometry.
+
+Domains consume the core layout instead of reproducing GPU-instance formats independently.
 
 ## Statistics domain
 
@@ -129,11 +146,11 @@ const encoding = new VisualEncoding({
 });
 ```
 
-`MetricPointCloud` writes encoded position, rotation, scale and RGB directly into the packed instance buffer. This preserves the high-density rendering model while allowing several independent metrics to be visible simultaneously.
+`MetricPointCloud` writes encoded position, rotation, scale and RGB directly into the packed instance buffer. Its current color encoding is uniform across all six face slots, preserving the existing statistical visual-channel contract while using the canonical per-face core layout underneath.
 
 Selection overlays preserve encoded position, rotation and scale instead of falling back to default geometry.
 
-Alpha currently remains a render/batch property. Per-face visual channels are a later packed-instance extension.
+Per-face RGBA is now a core rendering primitive. Domain-specific per-face visual semantics remain the responsibility of the domain or consuming application.
 
 ## Acoustics domain
 
