@@ -7,7 +7,7 @@ import { MAX_SLICES_PER_AXIS, OrthogonalFieldSlices } from '../domains/acoustics
 const field = { sample: (x, y, z) => x + y + z };
 
 test('SampledFieldPlane can recolor existing samples with an explicit shared range', () => {
-  const view = new SampledFieldPlane({ field, bounds: { min: [0, 0, 0], max: [2, 0, 2] }, resolution: [2, 2] });
+  const view = new SampledFieldPlane({ id: 'plane-range', field, bounds: { min: [0, 0, 0], max: [2, 0, 2] }, resolution: [2, 2] });
   view.rebuild();
   assert.deepEqual(view.sampleRange, [1, 3]);
   const valuesBefore = view.samples.map(sample => sample.value);
@@ -19,6 +19,7 @@ test('SampledFieldPlane can recolor existing samples with an explicit shared ran
 
 test('OrthogonalFieldSlices exposes sample range separately from the shared display range', () => {
   const view = new OrthogonalFieldSlices({
+    id: 'slice-range',
     field,
     bounds: { min: [0, 0, 0], max: [2, 2, 2] },
     counts: { x: 1, y: 1, z: 1 },
@@ -34,6 +35,7 @@ test('OrthogonalFieldSlices exposes sample range separately from the shared disp
 
 test('increasing slice count preserves all previously visible slice positions', () => {
   const view = new OrthogonalFieldSlices({
+    id: 'slice-position',
     field,
     bounds: { min: [0, 0, 0], max: [8, 4, 6] },
     counts: { x: 2, y: 0, z: 0 },
@@ -50,6 +52,7 @@ test('increasing slice count samples only newly added slices when field state is
   let sampleCount = 0;
   const countedField = { sample: (x, y, z) => { sampleCount += 1; return x + y + z; } };
   const view = new OrthogonalFieldSlices({
+    id: 'slice-sampling',
     field: countedField,
     bounds: { min: [0, 0, 0], max: [8, 4, 6] },
     counts: { x: 2, y: 0, z: 0 },
@@ -63,7 +66,7 @@ test('increasing slice count samples only newly added slices when field state is
 });
 
 test('slice count is limited to ten per axis', () => {
-  const view = new OrthogonalFieldSlices({ field, bounds: { min: [0, 0, 0], max: [2, 2, 2] } });
+  const view = new OrthogonalFieldSlices({ id: 'slice-limit', field, bounds: { min: [0, 0, 0], max: [2, 2, 2] } });
   assert.equal(MAX_SLICES_PER_AXIS, 10);
   assert.doesNotThrow(() => view.setSliceCount('x', 10));
   assert.throws(() => view.setSliceCount('x', 11), /0 to 10/);
