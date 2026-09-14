@@ -8,6 +8,7 @@
     "descriptive statistics",
     "range selections",
     "metric-space projection",
+    "dimension-to-visual-channel encoding for position rotation scale and color",
     "spatial point-cloud visualization",
     "packed typed instance buffers for high-density visualization",
     "consumer-provided metadata without interpreting application semantics"
