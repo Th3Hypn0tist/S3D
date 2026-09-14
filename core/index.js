@@ -5,6 +5,7 @@ import { S3D_VERSION, Scene, Selection, Playback, normalizePlaybackBoundaries } 
 import { Vec3, Mat4 } from './math.js';
 import { Renderer } from './renderer.js';
 import { FloatStore, RenderStore } from './render_store.js';
+import { BOX_VERTICES, BOX_FACES, BOX_FACE_ORDER, BOX_FACE_INDICES, BOX_EDGE_INDICES, boxFaceIndex } from './box_geometry.js';
 import { GlyphAtlas, WebGLBatchRenderer } from './webgl_batch_renderer.js';
 import { WebGLImageRenderer } from './webgl_image_renderer.js';
 import { PerspectiveCamera } from './camera.js';
@@ -39,6 +40,12 @@ const S3D = Object.freeze({
   Renderer,
   FloatStore,
   RenderStore,
+  BOX_VERTICES,
+  BOX_FACES,
+  BOX_FACE_ORDER,
+  BOX_FACE_INDICES,
+  BOX_EDGE_INDICES,
+  boxFaceIndex,
   GlyphAtlas,
   WebGLBatchRenderer,
   WebGLImageRenderer,
@@ -81,6 +88,12 @@ export {
   Renderer,
   FloatStore,
   RenderStore,
+  BOX_VERTICES,
+  BOX_FACES,
+  BOX_FACE_ORDER,
+  BOX_FACE_INDICES,
+  BOX_EDGE_INDICES,
+  boxFaceIndex,
   GlyphAtlas,
   WebGLBatchRenderer,
   WebGLImageRenderer,
