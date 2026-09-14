@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SceneObject } from '../core/objects/object.js';
-import { RenderStore } from '../core/render_store.js';
+import { BOX_INSTANCE_STRIDE, RenderStore } from '../core/render_store.js';
 import { TransformGizmoController, candidatePosition, candidateRotation, positionHandleHit, setCandidatePosition, setCandidateRotation } from '../core/interaction/transform-gizmo-controller.js';
 
 const identity = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
@@ -25,14 +25,17 @@ test('SceneObject exposes reactive rotation state', () => {
   assert.deepEqual(event.rotation, [.1,.2,.3]);
 });
 
-test('RenderStore box instances carry Euler rotation', () => {
+test('RenderStore box instances carry Euler rotation and replicated face color', () => {
   const store = new RenderStore();
   store.begin(identity);
   store.box([1,2,3], [4,5,6], [1,0,.5,.5], false, [.5,.25,.125]);
   const snapshot = store.snapshot();
   assert.equal(snapshot.counts.transparentBoxes, 1);
-  assert.equal(snapshot.transparentBoxes.length, 13);
-  assert.deepEqual([...snapshot.transparentBoxes.slice(0, 13)], [1,2,3,4,5,6,.5,.25,.125,1,0,.5,.5]);
+  assert.equal(snapshot.transparentBoxes.length, BOX_INSTANCE_STRIDE);
+  assert.deepEqual([...snapshot.transparentBoxes.slice(0, 9)], [1,2,3,4,5,6,.5,.25,.125]);
+  for (let offset = 9; offset < BOX_INSTANCE_STRIDE; offset += 4) {
+    assert.deepEqual([...snapshot.transparentBoxes.slice(offset, offset + 4)], [1,0,.5,.5]);
+  }
 });
 
 test('transform gizmo helpers prefer candidate adapters', () => {
