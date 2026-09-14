@@ -69,9 +69,7 @@ class FieldViewRangeCoordinator {
     if (!ranges.length) return this;
     const next = [Math.min(...ranges.map(range => range[0])), Math.max(...ranges.map(range => range[1]))];
     const sameAnalysis = this.hasRange && analysisSignature === this.analysisSignature;
-    this.range = sameAnalysis
-      ? [Math.min(this.range[0], next[0]), Math.max(this.range[1], next[1])]
-      : next;
+    if (!sameAnalysis) this.range = next;
     this.analysisSignature = analysisSignature;
     this.hasRange = true;
     this.rangeDirty = false;
