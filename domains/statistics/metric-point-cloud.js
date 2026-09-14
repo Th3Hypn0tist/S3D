@@ -297,7 +297,13 @@ class MetricPointCloud extends SceneObject {
         const observation = this.observations[index];
         const position = [this._positions[offset], this._positions[offset + 1], this._positions[offset + 2]];
         const width = Math.max(0.2, observation.label.length * 0.08);
-        const labelPosition = [position[0], position[1] + width * 0.25, position[2]];
+        const instanceOffset = index * BOX_INSTANCE_STRIDE;
+        const encodedScaleY = this._instances[instanceOffset + 4];
+        const labelPosition = [
+          position[0],
+          position[1] + encodedScaleY * this.selectedScaleMultiplier * 2.5,
+          position[2],
+        ];
         renderer.billboardText(observation.label, labelPosition, width, 0.12, this.selectedColor, this, context);
       }
     }
