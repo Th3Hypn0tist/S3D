@@ -4,6 +4,27 @@
 const BOX_INSTANCE_STRIDE = 13;
 const BOX_INSTANCE_KINDS = Object.freeze(['solid', 'transparent', 'outline']);
 
+function writeBoxInstance(buffer, offset, position, scale, rotation, color) {
+  if (!(buffer instanceof Float32Array)) throw new Error('writeBoxInstance requires Float32Array');
+  if (!Number.isInteger(offset) || offset < 0 || offset + BOX_INSTANCE_STRIDE > buffer.length) {
+    throw new Error('writeBoxInstance offset is outside the target buffer');
+  }
+  buffer[offset] = Number(position[0]);
+  buffer[offset + 1] = Number(position[1]);
+  buffer[offset + 2] = Number(position[2]);
+  buffer[offset + 3] = Number(scale[0]);
+  buffer[offset + 4] = Number(scale[1]);
+  buffer[offset + 5] = Number(scale[2]);
+  buffer[offset + 6] = Number(rotation[0] ?? 0);
+  buffer[offset + 7] = Number(rotation[1] ?? 0);
+  buffer[offset + 8] = Number(rotation[2] ?? 0);
+  buffer[offset + 9] = Number(color[0]);
+  buffer[offset + 10] = Number(color[1]);
+  buffer[offset + 11] = Number(color[2]);
+  const rawAlpha = Number(color[3] ?? 1);
+  buffer[offset + 12] = Number.isFinite(rawAlpha) ? Math.max(0, Math.min(1, rawAlpha)) : 1;
+}
+
 class FloatStore {
   constructor(initialCapacity = 1024) {
     this.buffer = new Float32Array(Math.max(1, initialCapacity));
@@ -57,17 +78,12 @@ class RenderStore {
   }
   box(position, scale, color, outline = false, rotation = [0, 0, 0]) {
     if (!this.viewProjection) throw new Error('RenderStore.box requires begin()');
-    const rawAlpha = Number(color[3] ?? 1);
-    const alpha = Number.isFinite(rawAlpha) ? Math.max(0, Math.min(1, rawAlpha)) : 1;
+    const instance = new Float32Array(BOX_INSTANCE_STRIDE);
+    writeBoxInstance(instance, 0, position, scale, rotation, color);
+    const alpha = instance[12];
     const transparent = !outline && alpha < 1;
     const target = outline ? this.outlineBoxes : transparent ? this.transparentBoxes : this.solidBoxes;
-    target.push(
-      Number(position[0]), Number(position[1]), Number(position[2]),
-      Number(scale[0]), Number(scale[1]), Number(scale[2]),
-      Number(rotation[0] ?? 0), Number(rotation[1] ?? 0), Number(rotation[2] ?? 0),
-      Number(color[0]), Number(color[1]), Number(color[2]),
-      alpha,
-    );
+    target.append(instance);
     if (outline) this.counts.outlineBoxes += 1;
     else if (transparent) this.counts.transparentBoxes += 1;
     else this.counts.solidBoxes += 1;
@@ -134,4 +150,4 @@ class RenderStore {
   }
 }
 
-export { BOX_INSTANCE_KINDS, BOX_INSTANCE_STRIDE, FloatStore, RenderStore };
+export { BOX_INSTANCE_KINDS, BOX_INSTANCE_STRIDE, FloatStore, RenderStore, writeBoxInstance };
