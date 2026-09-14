@@ -82,7 +82,42 @@ test('RangeSelection filters observations without interpreting metadata', () => 
   assert.deepEqual(selection.filter(observations).map(item => item.id), ['b', 'c']);
 });
 
-test('MetricPointCloud batches projected observations through core renderer primitives', () => {
+test('RenderStore accepts packed box instances as one bulk append', () => {
+  const store = new RenderStore();
+  store.begin(new Float32Array(16));
+  const count = 4096;
+  const instances = new Float32Array(count * 13);
+  for (let index = 0; index < count; index += 1) instances[index * 13 + 12] = 1;
+  store.boxInstances(instances, 'solid');
+  const snapshot = store.snapshot();
+  assert.equal(snapshot.counts.solidBoxes, count);
+  assert.equal(snapshot.solidBoxes.length, count * 13);
+});
+
+test('MetricPointCloud submits cached packed instance buffers instead of one draw call per observation', () => {
+  const space = MetricSpace.fit({
+    dimensions: [
+      new Dimension({ id: 'quality' }),
+      new Dimension({ id: 'speed' }),
+      new Dimension({ id: 'latency' }),
+    ],
+    axes: { x: 'quality', y: 'speed', z: 'latency' },
+    observations,
+  });
+  const cloud = new MetricPointCloud({ id: 'cloud', space, observations, showAxes: false });
+  const calls = [];
+  const renderer = {
+    boxInstances(instances, kind) { calls.push({ instances, kind }); },
+  };
+  cloud.draw(renderer);
+  cloud.draw(renderer);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].instances.length, observations.length * 13);
+  assert.strictEqual(calls[0].instances, calls[1].instances);
+  assert.equal(calls[0].kind, 'solid');
+});
+
+test('MetricPointCloud renders selection as a second small instanced overlay', () => {
   const space = MetricSpace.fit({
     dimensions: [
       new Dimension({ id: 'quality' }),
@@ -100,7 +135,7 @@ test('MetricPointCloud batches projected observations through core renderer prim
   cloud.draw(store);
   const snapshot = store.snapshot();
 
-  assert.equal(snapshot.counts.solidBoxes, 3);
+  assert.equal(snapshot.counts.solidBoxes, 4);
   assert.equal(snapshot.counts.lineVertices, 6);
   assert.equal(cloud.nearest([0, 0, 0]).observation.id, 'b');
   assert.deepEqual(cloud.projectedPoints().filter(point => point.selected).map(point => point.observation.id), ['b']);

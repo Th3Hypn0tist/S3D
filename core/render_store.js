@@ -1,6 +1,9 @@
 // Reusable high-density render store.
 // Pure data batching only: no globals, host semantics or renderer mutation.
 
+const BOX_INSTANCE_STRIDE = 13;
+const BOX_INSTANCE_KINDS = Object.freeze(['solid', 'transparent', 'outline']);
+
 class FloatStore {
   constructor(initialCapacity = 1024) {
     this.buffer = new Float32Array(Math.max(1, initialCapacity));
@@ -21,14 +24,20 @@ class FloatStore {
     this.buffer.set(values, this.length);
     this.length += values.length;
   }
+  append(values) {
+    if (!(values instanceof Float32Array)) throw new Error('FloatStore.append requires Float32Array');
+    this.ensure(values.length);
+    this.buffer.set(values, this.length);
+    this.length += values.length;
+  }
   view() { return this.buffer.subarray(0, this.length); }
 }
 
 class RenderStore {
   constructor() {
-    this.solidBoxes = new FloatStore(13 * 1024);
-    this.transparentBoxes = new FloatStore(13 * 1024);
-    this.outlineBoxes = new FloatStore(13 * 512);
+    this.solidBoxes = new FloatStore(BOX_INSTANCE_STRIDE * 1024);
+    this.transparentBoxes = new FloatStore(BOX_INSTANCE_STRIDE * 1024);
+    this.outlineBoxes = new FloatStore(BOX_INSTANCE_STRIDE * 512);
     this.lines = new FloatStore(6 * 2048);
     this.glyphs = new FloatStore(14 * 4096);
     this.flowPulses = new FloatStore(14 * 2048);
@@ -62,6 +71,23 @@ class RenderStore {
     if (outline) this.counts.outlineBoxes += 1;
     else if (transparent) this.counts.transparentBoxes += 1;
     else this.counts.solidBoxes += 1;
+  }
+  boxInstances(instances, kind) {
+    if (!this.viewProjection) throw new Error('RenderStore.boxInstances requires begin()');
+    if (!(instances instanceof Float32Array)) throw new Error('RenderStore.boxInstances requires Float32Array');
+    if (instances.length % BOX_INSTANCE_STRIDE !== 0) {
+      throw new Error(`RenderStore.boxInstances length must be divisible by ${BOX_INSTANCE_STRIDE}`);
+    }
+    if (!BOX_INSTANCE_KINDS.includes(kind)) {
+      throw new Error(`RenderStore.boxInstances kind must be one of: ${BOX_INSTANCE_KINDS.join(', ')}`);
+    }
+    const count = instances.length / BOX_INSTANCE_STRIDE;
+    if (count === 0) return;
+    const target = kind === 'solid' ? this.solidBoxes : kind === 'transparent' ? this.transparentBoxes : this.outlineBoxes;
+    target.append(instances);
+    if (kind === 'solid') this.counts.solidBoxes += count;
+    else if (kind === 'transparent') this.counts.transparentBoxes += count;
+    else this.counts.outlineBoxes += count;
   }
   line(start, end, color) {
     if (!this.viewProjection) throw new Error('RenderStore.line requires begin()');
@@ -108,4 +134,4 @@ class RenderStore {
   }
 }
 
-export { FloatStore, RenderStore };
+export { BOX_INSTANCE_KINDS, BOX_INSTANCE_STRIDE, FloatStore, RenderStore };

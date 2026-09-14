@@ -9,6 +9,7 @@
     "range selections",
     "metric-space projection",
     "spatial point-cloud visualization",
+    "packed typed instance buffers for high-density visualization",
     "consumer-provided metadata without interpreting application semantics"
   ],
   "mustNot": [
@@ -16,6 +17,7 @@
     "encode model, benchmark, LMTS or other consumer-specific semantics",
     "own consuming application project state",
     "reconstruct or invent missing consumer data",
+    "create one SceneObject or one renderer submission per observation for high-density point clouds",
     "introduce a dependency from core back to statistics"
   ]
 }
