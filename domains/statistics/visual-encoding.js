@@ -4,7 +4,7 @@ const VISUAL_CHANNELS = Object.freeze([
   'position.x', 'position.y', 'position.z',
   'rotation.x', 'rotation.y', 'rotation.z',
   'scale.x', 'scale.y', 'scale.z',
-  'color.r', 'color.g', 'color.b', 'color.a',
+  'color.r', 'color.g', 'color.b',
 ]);
 
 function outputRange(value, label) {
@@ -62,8 +62,9 @@ class VisualEncoding {
       this.value(`rotation.${'xyz'[index]}`, observation, space, fallback));
     const scale = defaults.scale.map((fallback, index) =>
       this.value(`scale.${'xyz'[index]}`, observation, space, fallback));
-    const color = defaults.color.map((fallback, index) =>
-      this.value(`color.${'rgba'[index]}`, observation, space, fallback));
+    const color = defaults.color.map((fallback, index) => (
+      index < 3 ? this.value(`color.${'rgb'[index]}`, observation, space, fallback) : fallback
+    ));
 
     if (scale.some(component => component <= 0)) {
       throw new Error('VisualEncoding scale channels must encode positive values');
