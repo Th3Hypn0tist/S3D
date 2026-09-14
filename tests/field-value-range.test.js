@@ -33,7 +33,7 @@ test('OrthogonalFieldSlices exposes sample range separately from the shared disp
   assert.equal(view.dirty, false);
 });
 
-test('increasing slice count preserves all previously visible slice positions', () => {
+test('increasing slice count redistributes slice positions evenly', () => {
   const view = new OrthogonalFieldSlices({
     id: 'slice-position',
     field,
@@ -41,14 +41,12 @@ test('increasing slice count preserves all previously visible slice positions', 
     counts: { x: 2, y: 0, z: 0 },
     resolution: { yz: [2, 2] },
   });
-  const two = view.slicePositions('x');
+  assert.deepEqual(view.slicePositions('x'), [8 / 3, 16 / 3]);
   view.setSliceCount('x', 3);
-  const three = view.slicePositions('x');
-  assert.deepEqual(three.slice(0, two.length), two);
-  assert.equal(new Set(three).size, 3);
+  assert.deepEqual(view.slicePositions('x'), [2, 4, 6]);
 });
 
-test('increasing slice count samples only newly added slices when field state is unchanged', () => {
+test('changing slice count resamples the complete redistributed topology', () => {
   let sampleCount = 0;
   const countedField = { sample: (x, y, z) => { sampleCount += 1; return x + y + z; } };
   const view = new OrthogonalFieldSlices({
@@ -60,9 +58,10 @@ test('increasing slice count samples only newly added slices when field state is
   });
   view.rebuild();
   const firstPass = sampleCount;
+  assert.equal(firstPass, 8);
   view.setSliceCount('x', 3);
   view.rebuild();
-  assert.equal(sampleCount - firstPass, 4);
+  assert.equal(sampleCount - firstPass, 12);
 });
 
 test('slice count is limited to ten per axis', () => {
