@@ -1,0 +1,121 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { RenderStore } from '../core/render_store.js';
+import {
+  Dimension,
+  Distribution,
+  MetricPointCloud,
+  MetricSpace,
+  Observation,
+  RangeSelection,
+} from '../domains/statistics/index.js';
+
+const observations = [
+  new Observation({ id: 'a', label: 'A', values: { quality: 20, speed: 10, latency: 200 } }),
+  new Observation({ id: 'b', label: 'B', values: { quality: 60, speed: 30, latency: 100 } }),
+  new Observation({ id: 'c', label: 'C', values: { quality: 100, speed: 50, latency: 0 } }),
+];
+
+function approximately(actual, expected, epsilon = 1e-12) {
+  assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`);
+}
+
+test('statistics dimensions project observations into explicit metric space bounds', () => {
+  const space = new MetricSpace({
+    dimensions: [
+      new Dimension({ id: 'quality', domain: [0, 100] }),
+      new Dimension({ id: 'speed', domain: [0, 50] }),
+      new Dimension({ id: 'latency', domain: [0, 200] }),
+    ],
+    axes: { x: 'quality', y: 'speed', z: 'latency' },
+  });
+
+  const projected = space.project(observations[1]);
+  approximately(projected[0], 0.2);
+  approximately(projected[1], 0.2);
+  approximately(projected[2], 0);
+  assert.deepEqual(
+    space.project(observations[1], { min: [0, 0, 0], max: [10, 20, 30] }),
+    [6, 12, 15],
+  );
+});
+
+test('MetricSpace.fit derives domains only from supplied observations', () => {
+  const space = MetricSpace.fit({
+    dimensions: [
+      new Dimension({ id: 'quality' }),
+      new Dimension({ id: 'speed' }),
+      new Dimension({ id: 'latency' }),
+    ],
+    axes: { x: 'quality', y: 'speed', z: 'latency' },
+    observations,
+  });
+
+  assert.deepEqual(space.dimension('quality').domain, [20, 100]);
+  assert.deepEqual(space.dimension('speed').domain, [10, 50]);
+  assert.deepEqual(space.dimension('latency').domain, [0, 200]);
+  assert.deepEqual(space.project(observations[1]), [0, 0, 0]);
+});
+
+test('constant dimensions have one defined midpoint projection', () => {
+  const dimension = new Dimension({ id: 'constant', domain: [4, 4] });
+  assert.equal(dimension.normalize(4), 0.5);
+  assert.throws(() => dimension.normalize(5), /constant domain/);
+});
+
+test('Distribution exposes deterministic descriptive statistics', () => {
+  const distribution = new Distribution([1, 2, 3, 4]);
+  assert.equal(distribution.summary.count, 4);
+  assert.equal(distribution.mean(), 2.5);
+  assert.equal(distribution.median(), 2.5);
+  assert.equal(distribution.quantile(0.25), 1.75);
+  assert.equal(distribution.variance('population'), 1.25);
+  approximately(distribution.variance('sample'), 5 / 3);
+});
+
+test('RangeSelection filters observations without interpreting metadata', () => {
+  const selection = new RangeSelection({
+    quality: [50, 100],
+    latency: [0, 120],
+  });
+  assert.deepEqual(selection.filter(observations).map(item => item.id), ['b', 'c']);
+});
+
+test('MetricPointCloud batches projected observations through core renderer primitives', () => {
+  const space = MetricSpace.fit({
+    dimensions: [
+      new Dimension({ id: 'quality' }),
+      new Dimension({ id: 'speed' }),
+      new Dimension({ id: 'latency' }),
+    ],
+    axes: { x: 'quality', y: 'speed', z: 'latency' },
+    observations,
+  });
+  const cloud = new MetricPointCloud({ id: 'cloud', space, observations });
+  cloud.select(['b']);
+
+  const store = new RenderStore();
+  store.begin(new Float32Array(16));
+  cloud.draw(store);
+  const snapshot = store.snapshot();
+
+  assert.equal(snapshot.counts.solidBoxes, 3);
+  assert.equal(snapshot.counts.lineVertices, 6);
+  assert.equal(cloud.nearest([0, 0, 0]).observation.id, 'b');
+  assert.deepEqual(cloud.projectedPoints().filter(point => point.selected).map(point => point.observation.id), ['b']);
+});
+
+test('MetricPointCloud rejects selection ids not present in the dataset', () => {
+  const space = MetricSpace.fit({
+    dimensions: [
+      new Dimension({ id: 'quality' }),
+      new Dimension({ id: 'speed' }),
+      new Dimension({ id: 'latency' }),
+    ],
+    axes: { x: 'quality', y: 'speed', z: 'latency' },
+    observations,
+  });
+  const cloud = new MetricPointCloud({ id: 'cloud', space, observations });
+  assert.throws(() => cloud.select(['missing']), /unknown observation/);
+});
