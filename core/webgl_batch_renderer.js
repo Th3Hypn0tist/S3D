@@ -2,7 +2,7 @@
 // Boxes use shared cube geometry + instancing, links use one packed line draw,
 // link flow is shader-driven, and text uses a shared glyph atlas + instanced quads.
 import { BOX_EDGE_INDICES, BOX_FACE_INDICES, BOX_VERTICES } from './box_geometry.js';
-import { BOX_INSTANCE_STRIDE, RenderStore } from './render_store.js';
+import { BOX_FACE_COLOR_OFFSET, BOX_FACE_COLOR_STRIDE, BOX_INSTANCE_STRIDE, RenderStore } from './render_store.js';
 
 function compile(gl, type, source) {
   const shader = gl.createShader(type);
@@ -26,22 +26,58 @@ layout(location=0) in vec3 p;
 layout(location=1) in vec3 instancePosition;
 layout(location=2) in vec3 instanceScale;
 layout(location=3) in vec3 instanceRotation;
-layout(location=4) in vec4 instanceColor;
+layout(location=4) in vec4 colorZNegative;
+layout(location=5) in vec4 colorZPositive;
+layout(location=6) in vec4 colorXNegative;
+layout(location=7) in vec4 colorXPositive;
+layout(location=8) in vec4 colorYNegative;
+layout(location=9) in vec4 colorYPositive;
 uniform mat4 vp;
-out vec4 color;
+out vec3 boxLocalPosition;
+flat out vec4 faceColorZNegative;
+flat out vec4 faceColorZPositive;
+flat out vec4 faceColorXNegative;
+flat out vec4 faceColorXPositive;
+flat out vec4 faceColorYNegative;
+flat out vec4 faceColorYPositive;
 vec3 rotateEuler(vec3 v, vec3 r){
   float cx=cos(r.x), sx=sin(r.x), cy=cos(r.y), sy=sin(r.y), cz=cos(r.z), sz=sin(r.z);
   v=vec3(v.x, v.y*cx-v.z*sx, v.y*sx+v.z*cx);
   v=vec3(v.x*cy+v.z*sy, v.y, -v.x*sy+v.z*cy);
   return vec3(v.x*cz-v.y*sz, v.x*sz+v.y*cz, v.z);
 }
-void main(){ color=instanceColor; vec3 local=rotateEuler(p*instanceScale,instanceRotation); gl_Position=vp*vec4(instancePosition+local,1.0); }`;
+void main(){
+  boxLocalPosition=p;
+  faceColorZNegative=colorZNegative;
+  faceColorZPositive=colorZPositive;
+  faceColorXNegative=colorXNegative;
+  faceColorXPositive=colorXPositive;
+  faceColorYNegative=colorYNegative;
+  faceColorYPositive=colorYPositive;
+  vec3 local=rotateEuler(p*instanceScale,instanceRotation);
+  gl_Position=vp*vec4(instancePosition+local,1.0);
+}`;
 
 const BOX_FS = `#version 300 es
 precision highp float;
-in vec4 color;
+in vec3 boxLocalPosition;
+flat in vec4 faceColorZNegative;
+flat in vec4 faceColorZPositive;
+flat in vec4 faceColorXNegative;
+flat in vec4 faceColorXPositive;
+flat in vec4 faceColorYNegative;
+flat in vec4 faceColorYPositive;
 out vec4 outColor;
-void main(){ outColor=color; }`;
+void main(){
+  vec3 magnitude=abs(boxLocalPosition);
+  if(magnitude.z>=magnitude.x && magnitude.z>=magnitude.y){
+    outColor=boxLocalPosition.z<0.0?faceColorZNegative:faceColorZPositive;
+  }else if(magnitude.x>=magnitude.y){
+    outColor=boxLocalPosition.x<0.0?faceColorXNegative:faceColorXPositive;
+  }else{
+    outColor=boxLocalPosition.y<0.0?faceColorYNegative:faceColorYPositive;
+  }
+}`;
 
 const FLOW_VS = `#version 300 es
 layout(location=0) in vec3 p;
@@ -202,7 +238,10 @@ class WebGLBatchRenderer {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, instanceBuffer);
     const stride = BOX_INSTANCE_STRIDE * 4;
-    const spec = [[1,3,0],[2,3,3],[3,3,6],[4,4,9]];
+    const spec = [[1,3,0],[2,3,3],[3,3,6]];
+    for (let faceIndex = 0; faceIndex < 6; faceIndex += 1) {
+      spec.push([4 + faceIndex, 4, BOX_FACE_COLOR_OFFSET + faceIndex * BOX_FACE_COLOR_STRIDE]);
+    }
     for (const [attr, size, offset] of spec) {
       gl.enableVertexAttribArray(attr);
       gl.vertexAttribPointer(attr, size, gl.FLOAT, false, stride, offset * 4);
@@ -273,6 +312,7 @@ class WebGLBatchRenderer {
     this.stats.uploadBytes = 0;
   }
   box(position, scale, color, outline = false, source = null) { this.store.box(position, scale, color, outline, source?.rotation ?? [0, 0, 0]); }
+  boxFaces(position, scale, faceColors, outline = false, source = null) { this.store.boxFaces(position, scale, faceColors, outline, source?.rotation ?? [0, 0, 0]); }
   line(start, end, color) { this.store.line(start, end, color); }
   flow(start, end, scale, color, phase = 0, speed = 0) { this.store.flow(start, end, scale, color, phase, speed); }
   text(text, center, width, height, color) { this.queueText(text, center, width, height, color, false); }
