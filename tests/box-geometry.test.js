@@ -61,11 +61,11 @@ test('packed box layout contains one transform and six canonical RGBA face slots
 
 test('writeBoxInstance replicates one uniform color into every canonical face slot', () => {
   const instance = new Float32Array(BOX_INSTANCE_STRIDE);
-  writeBoxInstance(instance, 0, [1, 2, 3], [4, 5, 6], [.1, .2, .3], [.25, .5, .75, .8]);
-  assert.deepEqual([...instance.slice(0, 9)], [1, 2, 3, 4, 5, 6, .1, .2, .3]);
+  writeBoxInstance(instance, 0, [1, 2, 3], [4, 5, 6], [.5, .25, .125], [.25, .5, .75, .5]);
+  assert.deepEqual([...instance.slice(0, 9)], [1, 2, 3, 4, 5, 6, .5, .25, .125]);
   for (let faceIndex = 0; faceIndex < BOX_FACE_ORDER.length; faceIndex += 1) {
     const offset = BOX_FACE_COLOR_OFFSET + faceIndex * BOX_FACE_COLOR_STRIDE;
-    assert.deepEqual([...instance.slice(offset, offset + 4)], [.25, .5, .75, .8]);
+    assert.deepEqual([...instance.slice(offset, offset + 4)], [.25, .5, .75, .5]);
   }
   assert.equal(boxInstanceHasTransparency(instance), true);
 });
