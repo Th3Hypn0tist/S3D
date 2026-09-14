@@ -6,6 +6,15 @@ import { TransformGizmoController, candidatePosition, candidateRotation, positio
 
 const identity = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 
+function approximately(actual, expected, epsilon = 1e-12) {
+  assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`);
+}
+
+function approximatelyVector(actual, expected, epsilon = 1e-12) {
+  assert.equal(actual.length, expected.length);
+  for (let index = 0; index < actual.length; index += 1) approximately(actual[index], expected[index], epsilon);
+}
+
 test('SceneObject exposes reactive rotation state', () => {
   const object = new SceneObject({ id: 'object' });
   let event = null;
@@ -39,7 +48,7 @@ test('transform gizmo helpers prefer candidate adapters', () => {
   setCandidatePosition(candidate, [2,3,4]);
   setCandidateRotation(candidate, [.2,.3,.4]);
   assert.deepEqual(candidate.position, [4,6,8]);
-  assert.deepEqual(candidate.rotation, [.6,.9,1.2]);
+  approximatelyVector(candidate.rotation, [.6,.9,1.2]);
 });
 
 test('position gizmo exposes pickable Y and Z handles', () => {
@@ -68,16 +77,16 @@ test('Y and Z handle drags constrain motion to the selected axis', () => {
   const camera = { ray(x, y) { return { origin: [x / 100, y / 100, -5], direction: [0, 0, 1] }; } };
   const controller = new TransformGizmoController(canvas, camera, scene, { enabled: true });
 
-  controller.pointer = { candidate, handle: 'y', startPosition: [1, 2, 3], startAxisParameter: 2 };
+  controller.pointer = { candidate, handle: 'y', startPosition: [1, 2, 3], startAxisParameter: 0 };
   camera.ray = () => ({ origin: [1, 5, -5], direction: [0, 0, 1] });
   controller.positionPointerHandle({ clientX: 0, clientY: 0 });
   assert.deepEqual(candidate.position, [1, 5, 3]);
 
   candidate.position = [1, 2, 3];
-  controller.pointer = { candidate, handle: 'z', startPosition: [1, 2, 3], startAxisParameter: 3 };
-  camera.ray = () => ({ origin: [1, 2, -5], direction: [0, 0, 1] });
+  controller.pointer = { candidate, handle: 'z', startPosition: [1, 2, 3], startAxisParameter: 0 };
+  camera.ray = () => ({ origin: [5, 2, 6], direction: [-1, 0, 0] });
   controller.positionPointerHandle({ clientX: 0, clientY: 0 });
-  assert.deepEqual(candidate.position, [1, 2, 3]);
+  assert.deepEqual(candidate.position, [1, 2, 6]);
 
   controller.destroy();
 });
